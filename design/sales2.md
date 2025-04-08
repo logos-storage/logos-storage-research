@@ -17,60 +17,56 @@ flowchart TB
 
   SalesStorage --"Availability +<br>SaleOrder<br>state"--> MetadataStore
   SalesStorage --"dedicated quota"--> SalesRepo
-
-    %% storageDelete --> salesRepoDelete
-    %% salesActiveCleanup --> storageDelete
-    %% salesPassiveCleanup --> storageDelete
-
-    %% storageStore --> salesRepoStore
-    %% salesDownload --> storageCreateSalesObj
-
-    %% salesRepoStore --> metaRefCountCrud
-    %% salesRepoDelete --> metaRefCountCrud
-
-    %% storageCreateSalesObj --> metaCreateSalesObj
-
-    %% storageArchiveSalesObj --> metaArchiveSalesObj
-
-
-
-
 ```
 
+## Storage request lifecycle
 
-Full diagram
+### Selling storage
+
+When a request for storage is submitted on chain, the sales module decides
+whether or not it wants to act on it. First, it tries to match the incoming
+request to the availability configured by the SP by comparing the storage
+request's duration and price per byte per second to the values in the
+availability. If there is a match, the SPs [funding
+account](#funding-account-vs-profit-account) balance is checked to ensure there
+is enough collateral that could be used for hosting the slot. If there is, the
+SP moves on to reserving the slot, creating a `SalesOrder`, downloading the
+content, generating a proof, and finally filling the slot by submitting the
+proof and collateral to the contract.
+
+```mermaid
+sequenceDiagram
+  participant Marketplace
+  participant Sales
+  participant SalesStorage
+  participant SalesRepo
+  participant RepoStore
+  participant MetadataStore
+
+  Marketplace ->> Sales: incoming request
+  Sales ->> SalesStorage: find availability
+  SalesStorage ->> MetadataStore: query availability
+  Sales ->> SalesStorage: download
+  SalesStorage ->> SalesRepo: create SalesOrder
+  SalesRepo ->> MetadataStore: create SalesOrder
+  SalesStorage ->> SalesRepo: store dataset
+  SalesRepo ->> RepoStore: store(datasetId)
+```
+
+#### Sales state machine
+
+Incoming storage requests are put into a slot queue and ordered by their
+profiability. As slots are processed in the queue, an instance of a state
+machine is created, called a `SalesAgent`. The `SalesAgent` is responsible for
+moving the sales through each of the stages of its lifecycle.
 
 ```mermaid
 ---
-config:
-  theme: redux
-  look: neo
-  layout: elk
+config
+layout elk
 ---
 flowchart TB
- subgraph sales["Sales"]
-        salesLoad["Load"]
-        salesProcessSlot["Process slot"]
-        salesActiveCleanup["Active cleanup"]
-        salesPassiveCleanup["Corrective cleanup"]
-        salesDownload["Download"]
-        salesLoad --> salesPassiveCleanup
-  end
- subgraph storage["Sales storage"]
-        storageDelete["Delete dataset"]
-        storageStore["Store dataset"]
-        storageCreateSalesObj["Create SalesObject"]
-        storageArchiveSalesObj["Archive SalesObject"]
-        storageCreateSalesObj --> storageStore
-        storageDelete --> storageArchiveSalesObj
-  end
-
-subgraph metaData["MetadataStore"]
-    metaCreateSalesObj["Create SalesObject"]
-    metaArchiveSalesObj["Archive SalesObject"]
-    metaRefCountCrud["Ref count CRUD"]
-  end
- subgraph fsm["Sales state machine"]
+  subgraph fsm["SalesAgent (state machine)"]
         preparing["Preparing"]
         reserving["Reserving"]
         download["Download"]
@@ -87,72 +83,73 @@ subgraph metaData["MetadataStore"]
     preparing --> reserving
     preparing --> ignored
     preparing --> errored
+    preparing --> cancelled
+    preparing --> failed
     reserving --> download
     reserving --> ignored
     reserving --> errored
+    reserving --> cancelled
+    reserving --> failed
     download --> initialProving
     download --> errored
+    download --> cancelled
+    download --> failed
     initialProving --> filling
     initialProving --> errored
+    initialProving --> cancelled
+    initialProving --> failed
     filling --> filled
     filling --> ignored
     filling --> errored
+    filling --> cancelled
+    filling --> failed
     filled --> proving
     filled --> errored
+    filled --> cancelled
+    filled --> failed
     proving --> payout
     proving --> errored
+    proving --> cancelled
+    proving --> failed
     payout --> finished
     payout --> errored
+    payout --> cancelled
+    payout --> failed
     finished --> errored
     failed --> errored
   end
- subgraph contracts["Marketplace contracts"]
-        contractsFreeSlot["Free slot"]
+```
+
+### Restoring on chain state
+
+When a node is restarted, actively filled slots on chain are restored into their
+last state in the state machine. This allows resumption of duties such as
+providing regular proofs for storage requests, or freeing slots if the request
+has ended.
+
+```mermaid
+sequenceDiagram
+  Sales ->> Marketplace: mySlots
+  loop For each active slot on chain
+    Sales ->> SalesAgent: create SalesAgent in corresponding state
   end
- subgraph market["Market abstraction"]
-        marketFreeSlot["Free slot"]
-  end
- subgraph salesRepo["SalesRepo"]
-        salesRepoStore["Store dataset"]
-        salesRepoDelete["Delete dataset"]
-  end
- subgraph salesAgent["SalesAgent"]
-        agentCleanUp["Active cleanup"]
-        agentDownload["Download"]
-  end
+```
 
+### Ending a request
 
-    storageDelete --> salesRepoDelete
-    salesActiveCleanup --> storageDelete
-    salesPassiveCleanup --> storageDelete
+When a storage request comes to an end, or if there was an error that occurred
+along the way (such as a failed download), the content of the dataset will be
+deleted and the `SalesOrder` will be archived. then the content can be removed from the
+repo and the storage space can be made available for sale again. The same should
+happen when something went wrong in the process of selling storage.
 
-    storageStore --> salesRepoStore
-    download --> agentDownload
-    agentCleanUp --> salesActiveCleanup
-    agentDownload --> salesDownload
-    salesDownload --> storageCreateSalesObj
-
-    salesRepoStore --> metaRefCountCrud
-    salesRepoDelete --> metaRefCountCrud
-
-    storageCreateSalesObj --> metaCreateSalesObj
-
-    storageArchiveSalesObj --> metaArchiveSalesObj
-
-    salesProcessSlot --> salesAgent
-    %% salesAgent <--> fsm
-
-    cancelled --> agentCleanUp
-    failed --> agentCleanUp
-    finished --> agentCleanUp
-    errored --> agentCleanUp
-
-    marketFreeSlot --> contractsFreeSlot
-
-    payout --> marketFreeSlot
-    failed --> marketFreeSlot
-    cancelled --> marketFreeSlot
-
+```mermaid
+sequenceDiagram
+  Marketplace ->> Sales: request ended
+  Sales ->> SalesStorage: cleanup
+  SalesStorage ->> SalesRepo: delete dataset
+  SalesRepo ->> RepoStore: delete(datasetId)
+  SalesRepo ->> MetadataStore: archive SalesOrder
 ```
 
 ## `SalesStorage` module
@@ -218,11 +215,12 @@ random access with the `RequestId`. Therefore, at a minimum, the `RequestId` and
 slot index of the slot that was hosted would need to be persisted by the SP for
 the SP to keep track of slots that were hosted.
 
-| Property    | Description                                                                                                                                          |
-|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `requestId` | `RequestId` of the `StorageRequest`. Can be used to retrieve storage request details.                                                                |
-| `slotIndex` | Slot index of the slot being hosted.                                                                                                                 |
-| `treeCid`   | CID of the manifest dataset, used for `SalesRepo` interaction. TODO: `manifestCid` may be sufficient. Depends on the final design of the `RepoStore` |
+| Property    | Description                                                                                                                                                   |
+|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `requestId` | `RequestId` of the `StorageRequest`. Can be used to retrieve storage request details.                                                                         |
+| `slotIndex` | Slot index of the slot being hosted.                                                                                                                          |
+| `treeCid`   | CID of the manifest dataset, used for `SalesRepo` interaction. TODO: `manifestCid` may not be sufficient. Final dataset identifier in the `RepoStore` is TBD. |
+| `version`   | Object version used for migrations. |
 
 #### `SalesOrder` lifecycle
 
@@ -232,14 +230,40 @@ be deleted as they represent historical sales of the SP.
 
 When the `SalesOrder` object is first created, its key will be created in the
 `/active` namespace. After data for the `SalesOrder` has been deleted (if there
-is any) in a clean up procedure, the key will be moved from the `/active`
+is any) in a cleanup procedure, the key will be moved from the `/active`
 namespace to the `/archive` namespace. These key namespace manipulations
-facilitate future lookups in active/corrective clean up operations.
+facilitate future lookups in active/corrective cleanup operations.
+
+```mermaid
+sequenceDiagram
+  participant Sales
+  participant SalesStorage
+  participant SalesRepo
+  participant RepoStore
+  participant MetadataStore
+
+  Sales ->> SalesStorage: download
+  SalesStorage ->> SalesRepo: create SalesOrder
+  SalesRepo ->> MetadataStore: create SalesOrder in /active namespace
+
+  Sales ->> SalesStorage: cleanup
+  SalesStorage ->> SalesRepo: delete dataset
+  SalesRepo ->> RepoStore: delete(datasetId)
+  SalesRepo ->> MetadataStore: archive SalesOrder (move to /archive) namespace
+```
 
 If there's support for [tracking the latest state in the
 `SalesOrder`](#tracking-latest-state-machine-state), `SalesOrder.state`
 will be modified as the sale progresses through each state of the Sales state
 machine.
+
+#### Migrations
+
+Future updates to the `SalesOrder` object will require migration of existing
+`SalesOrder` objects. In order for the node to understand which version of an
+object is has at the time of migration, a `version` field is stored in the
+`SalesOrder` object. After the migration has been performed, the version number
+will be set to the version that has been migrated to.
 
 ### Query support
 
@@ -254,9 +278,9 @@ up routines. The following queries will need to be supported:
    consumption](#concurrent-workers-prevent-unnecessary-resource-consumption),
    by additionally querying the slot size of `SalesOrders` that are in or past
    the Downloading state (`/active` `SalesOrders`).
-2. Clean up routines will need to know the "active sales", or any `SalesOrders`
+2. Cleanup routines will need to know the "active sales", or any `SalesOrders`
    in the `/active` key namespace (those that have not been archived) through
-   the state machine or clean up routines.
+   the state machine or cleanup routines.
 3. Servicing a new slot will require sufficient [total
    collateral](#total-collateral), which is the remaining balance in the funding
    account. In the future, this can be optimised to [prevent unnecessary
@@ -297,6 +321,24 @@ direction TB
     class SalesRepo:::focusClass
     classDef focusClass fill:#c4fdff,stroke:#333,stroke-width:4px,color:black
 ```
+
+### RepoStore API
+
+The underlying `RepoStore` of the `SalesRepo` is responsible to reading and
+writing datasets to storage. Its API will include:
+
+```nim
+proc store(id: DatasetId)
+ ## Stores blocks of the dataset, incrementing their ref count.
+proc delete(id: DatasetId)
+ ## Decreases the ref count of blocks of the dataset, deleting if the ref count is 0.
+```
+
+Datasets will be tracked by a particular id, but it is TBD as to what that ID
+will be:
+
+- Preferred option for MP is `manifestCID + slotIndex`.
+- Alternative options discussed: `treeCid + slotIndex`, `slotRoot`.
 
 ## Total collateral
 
@@ -364,9 +406,7 @@ flowchart TB
         PassiveCleanup[Corrective cleanup]
         Load --> PassiveCleanup
   end
-  FSM[Sales state machine]
-  ProcessSlot --> SalesAgent
-  SalesAgent <--> FSM
+  ProcessSlot --> SalesAgent["SalesAgent (state machine)"]
   SalesAgent --> ActiveCleanup
 ```
 
@@ -385,13 +425,13 @@ config:
   theme: redux
 ---
 flowchart TB
-    CleanUp(["Active CleanUp"]) -- Current SaleOrder -->
+    Cleanup(["Active Cleanup"]) -- Current SaleOrder -->
 
     Delete["Delete dataset"] -->
     Archive["Archive SalesOrder"] -->
-    Done
+    Done@{ shape: dbl-circ, label: "Done" }
 
-     CleanUp:::start
+     Cleanup:::start
     classDef start fill:#000000, color:#FFFFFF
 ```
 
@@ -407,14 +447,29 @@ as persisting a `SalesOrder` and downloading a dataset. In this case, corrective
 cleanup is needed to ensure that datasets that not being actively hosted are
 removed from the node.
 
-On node startup, active sales will be retrieved from the Marketplace
-contract via `mySlots`. Then, all `SalesOrders` in the `/active` namespace will
-be queried. Any `SalesOrders` with a slot id not in the set of active sales
+On node startup, active sales will be retrieved from the Marketplace contract
+via `mySlots`. Then, all `SalesOrders` in the `/active` namespace will be
+queried. Any `SalesOrders` with a slot id not in the set of active sales
 (`mySlots`) will have the data associated with the slot deleted, if there is
 any. Any `SalesOrders` associated with `StorageRequests` that are in the `New`
 or `Fulfilled` state should be ignored in this process, otherwise datasets of
-sales that are in the process of being processed may be impacted. Finally, the
-`SalesOrder` will be archived by moving its key to the `/archive` namespace.
+sales that are in the process of being processed may be impacted (particularly
+important in the case of [resumable downloads](#resumable-downloads)). Finally,
+the `SalesOrder` will be archived by moving its key to the `/archive` namespace.
+
+```mermaid
+sequenceDiagram
+  participant Sales
+  participant Marketplace
+  participant SalesStorage
+
+  Sales ->> Marketplace: get active slots on chain (mySlots)
+  Sales ->> SalesStorage: get active SalesOrders
+  loop SalesOrder datasets not actively filled on chain
+    Sales ->> Marketplace: is request state active?
+    Sales ->> SalesStorage: delete dataset
+  end
+```
 
 ```mermaid
 ---
@@ -422,11 +477,11 @@ config:
   theme: redux
 ---
 flowchart TB
-    CleanUp(["Corrective CleanUp"]) --/active SalesOrders -->
+    Cleanup@{ shape: stadium, label: "Corrective cleanup" } --/active SalesOrders -->
     %% TimeInterval[Every time interval] -- /active SalesOrders-->
-    QueryResults(("SalesOrders not<br>actively filled<br>on chain"))
-
-    CleanUp -- Active sales on chain -->
+    QueryResults@{ shape: circle, label: "SalesOrders not<br/>actively filled<br/>on chain" }
+    %% Cleanup
+    Cleanup -- Active sales on chain -->
     QueryResults --"SalesOrder"-->
     IsActiveRequest{Is request active?} --"No"-->
     Delete["Delete dataset"] -->
@@ -435,8 +490,34 @@ flowchart TB
 
     IsActiveRequest --"Yes"--> QueryResults
 
-     CleanUp:::start
+     Cleanup:::start
     classDef start fill:#000000, color:#FFFFFF
+```
+
+## Startup ordering
+
+On startup, the Sales module should first restore the on chain state by loading
+any filled slots into their respective state of the state machine. Performing
+this step first prioritises filled slot duties of the SP, like provided storage
+proofs.
+
+Then, [corrective cleanup](#corrective-cleanup) and slot matching can start,
+with corrective cleanup operating as a background task. It is important to note
+that these two operations should not interfere with each other. Corrective
+cleanup checks the `StorageRequest` state associated with the `SalesOrder` has
+completed to ensure that it will not delete the datasets of sales that are being
+processed by the SP (while slot matching).
+
+Slot matching should wait for completion of restoration of on chain state to
+prevent new hosting duties from consuming the thread and slowing down
+already-committed hosting duties like submitting proofs.
+
+```mermaid
+flowchart LR
+  Restore@{ shape: subproc, label: "Restore on chain state"} -->
+  Parallel@{ shape: join, label: "Run in parallel" } -->
+  Cleanup@{ shape: subproc, label: "Corrective cleanup"}
+  Parallel --> SlotMatching@{ shape: subproc, label: "Slot matching"}
 ```
 
 ## Sale flow
@@ -521,8 +602,9 @@ see below.
 
 ### Concurrent workers: prevent unnecessary resource consumption
 
-Depends on: Tracking latest state machine state<br/>
-Depends on: Concurrent workers
+Depends on: Tracking latest state machine state<br>
+Depends on: Concurrent workers<br>
+Depends on: Resumable downloads (optional)
 
 To prevent unnecessary reserving, downloading, and proof generation when there
 are concurrent workers, collateral and storage quota checks can be optimised.
@@ -542,13 +624,48 @@ to, we should avoid using only `/active` `SalesOrders` to determine total
 collateral and slot size, as opposed to using only those not filled on chain (in
 `mySlots`). This is because there are many circumstances that may lead to
 incorrectly accounted `SalesOrders` and that would affect the SPs ability to
-fill slots. In the language of the design rules, `SalesOrders` state for filled
-slots is not the "source of truth" and therefore should not be relied upon.
+fill slots. In the language of the design rules, `SalesOrders` state *for filled
+slots* is not the "source of truth" and therefore should not be relied upon.
 
-One caveat, however, is that slot matching must wait for cleanup routines to
-complete during startup. This is because on startup, there may be `/active`
-`SalesOrders` not in `/mySlots` that will get deleted/archived during startup
-cleanup and should not count towards total collateral or slot size.
+One caveat, however, is the order of state restoration, corrective cleanup, and
+slot matching must be considered on node startup if [resumable
+downloads](#resuming-local-state-eg-downloading) are not supported. Only one of the following
+two cases must be true. Note, it is important to consider that state restoration
+of filled slots (on chain) should be performed with priority so the node can
+resume its filled slot duties.
+
+1. **Resumable download support**<br>Resumable downloads restores on chain state
+   and local `SalesOrder` state by starting each sale in their respective state
+   in the state machine. This must happen before corrective cleanup occurs so
+   there are no unnecessary deletes. Restored `SalesOrders` would count towards
+   total collateral or slot size when matching new slots. This most closely
+   matches the default ordering and is the preferred option as it simply adds a
+   "restore local state" step after "restore on chain state".
+
+   ```mermaid
+      flowchart LR
+        RestoreOnchain@{ shape: subproc, label: "Restore on chain state"} -->
+        RestoreLocal@{ shape: subproc, label: "Restore local state"} -->
+        Parallel@{ shape: join, label: "Run in parallel" } -->
+        Cleanup@{ shape: subproc, label: "Corrective cleanup"}
+        Parallel --> SlotMatching@{ shape: subproc, label: "Slot matching"}
+    ```
+
+2. **No resumable download support**<br>Slot matching must wait for cleanup
+   routines to complete during startup. This is because on startup, locally
+   stored `SalesOrders` will not have their state restored and therefore should
+   not count towards used total collateral or slot size. In this case, corrective
+   cleanup must delete unfilled `SalesOrders` before slot matching occurs. This
+   is a less preferred option because it changes the corrective cleanup action
+   from a background task to a task that must be completed, and waited on before
+   resuming slot matching.
+
+   ```mermaid
+      flowchart LR
+        RestoreOnchain@{ shape: subproc, label: "Restore on chain state"} -->
+        RestoreLocal@{ shape: subproc, label: "Corrective cleanup"} -->
+        SlotMatching@{ shape: subproc, label: "Slot matching"}
+    ```
 
 The following properties would need to be added to the `SalesOrder` object in
 order to prevent unnecessary resource consumption:
@@ -576,6 +693,24 @@ incremented. TODO: `manifestCid` may be used instead depending on find
 `RepoStore` design. When the dataset is deleted, the ref count is decremented.
 Only when the ref count is 0 is the dataset actually deleted in the underlying
 `RepoStore`.
+
+```mermaid
+sequenceDiagram
+  participant Sales
+  participant SalesStorage
+  participant SalesRepo
+  participant RepoStore
+  participant MetadataStore
+  Sales ->> SalesStorage: store dataset
+  SalesStorage ->> SalesRepo: store dataset
+  SalesRepo ->> MetadataStore: increase refCount
+  SalesRepo ->> RepoStore: store(datasetId)
+  Sales ->> SalesStorage: delete dataset
+  SalesStorage ->> SalesRepo: delete dataset
+  SalesRepo ->> MetadataStore: decrease refCount
+  SalesRepo ->> MetadataStore: refCount == 0?
+  SalesRepo ->> RepoStore: delete(datasetId)
+```
 
 On startup, state machine states are restored for active slots, effectively
 skipping previous states that incremented the ref count. Therefore, the ref
@@ -641,7 +776,7 @@ config:
   theme: redux
 ---
 flowchart TB
-    CleanUp(["Clean Up"]) --"SalesOrder"-->
+    Cleanup(["Cleanup"]) --"SalesOrder"-->
     ExistsMultiple{"Exists more than<br>one /active SalesOrder<br>with slot id?"} -- "No" -->
     Delete["Delete dataset (if<br>one exists)"] -->
     Archive["Archive SalesOrder"]
@@ -649,8 +784,39 @@ flowchart TB
     ExistsMultiple -- "Yes" -->
     DoNotDelete["Do not delete dataset"]
 
-     CleanUp:::start
+     Cleanup:::start
     classDef start fill:#000000, color:#FFFFFF
+```
+
+### Resuming local state, eg downloading
+
+Depends on: Tracking latest state machine state
+
+If a node shuts down or crashes while processing a slot before it was able to
+fill the slot, it can be
+possible to recover the state and resume where it left off. The latest state that
+each sale reached [would be tracked](#tracking-latest-state-machine-state) in
+the `SalesOrder` object. On restart, the state of each of these `SalesOrders`
+would be restored, similar to how state is [restored for on chain filled
+slots](#restoring-on-chain-state). A new `SalesAgent` would be created for each
+local `SalesOrder`, starting in the state of the state machine that it left off in.
+
+Careful consideration would need to be taken in each state machine step to
+ensure that any assumptions at each state are validated at the start, as it
+cannot be guaranteed that previous states will have been visited first.
+
+Additionally, order of state restoration must occur before corrective cleanup
+and slot matching to ensure that actively processed slots are not deleted by the
+corrective cleanup. It is important to note that restoring of on chain state to
+occur first to minimise any penalties that could incur for missed proofs.
+
+```mermaid
+  flowchart LR
+    RestoreOnchain@{ shape: subproc, label: "Restore on chain state"} -->
+    RestoreLocal@{ shape: subproc, label: "Restore local state"} -->
+    Parallel@{ shape: join, label: "Run in parallel" } -->
+    Cleanup@{ shape: subproc, label: "Corrective cleanup"}
+    Parallel --> SlotMatching@{ shape: subproc, label: "Slot matching"}
 ```
 
 ## Purchasing
@@ -709,3 +875,117 @@ pertaining to those sales.
 
 In the design, this rule has been followed by copying information from the
 matched `Availability` into a `SalesOrder`.
+
+## Appendix A. Complete sales architecture
+
+```mermaid
+---
+config:
+  theme: redux
+  look: neo
+  layout: elk
+---
+flowchart TB
+ subgraph sales["Sales"]
+        salesLoad["Load"]
+        salesProcessSlot["Process slot"]
+        salesActiveCleanup["Active cleanup"]
+        salesPassiveCleanup["Corrective cleanup"]
+        salesDownload["Download"]
+        salesLoad --> salesPassiveCleanup
+  end
+ subgraph storage["Sales storage"]
+        storageDelete["Delete dataset"]
+        storageStore["Store dataset"]
+        storageCreateSalesObj["Create SalesObject"]
+        storageArchiveSalesObj["Archive SalesObject"]
+        storageCreateSalesObj --> storageStore
+        storageDelete --> storageArchiveSalesObj
+  end
+
+subgraph metaData["MetadataStore"]
+    metaCreateSalesObj["Create SalesObject"]
+    metaArchiveSalesObj["Archive SalesObject"]
+    metaRefCountCrud["Ref count CRUD"]
+  end
+ subgraph fsm["SalesAgent (state machine)"]
+        preparing["Preparing"]
+        reserving["Reserving"]
+        download["Download"]
+        initialProving["Gen proof"]
+        filling["Filling"]
+        filled["Filled"]
+        proving["Proving"]
+        payout["Payout"]
+        finished["Finished"]
+        errored["Errored"]
+        cancelled["Cancelled"]
+        ignored["Ignored"]
+        failed["Failed"]
+    preparing --> reserving
+    preparing --> ignored
+    preparing --> errored
+    reserving --> download
+    reserving --> ignored
+    reserving --> errored
+    download --> initialProving
+    download --> errored
+    initialProving --> filling
+    initialProving --> errored
+    filling --> filled
+    filling --> ignored
+    filling --> errored
+    filled --> proving
+    filled --> errored
+    proving --> payout
+    proving --> errored
+    payout --> finished
+    payout --> errored
+    finished --> errored
+    failed --> errored
+  end
+ subgraph contracts["Marketplace contracts"]
+        contractsFreeSlot["Free slot"]
+  end
+ subgraph market["Market abstraction"]
+        marketFreeSlot["Free slot"]
+  end
+ subgraph salesRepo["SalesRepo"]
+        salesRepoStore["Store dataset"]
+        salesRepoDelete["Delete dataset"]
+  end
+ subgraph salesAgent["SalesAgent"]
+
+  end
+
+
+    storageDelete --> salesRepoDelete
+    salesActiveCleanup --> storageDelete
+    salesPassiveCleanup --> storageDelete
+
+    storageStore --> salesRepoStore
+    download --> salesDownload
+    salesDownload --> storageCreateSalesObj
+
+    salesRepoStore --> metaRefCountCrud
+    salesRepoDelete --> metaRefCountCrud
+
+    storageCreateSalesObj --> metaCreateSalesObj
+
+    storageArchiveSalesObj --> metaArchiveSalesObj
+
+    salesProcessSlot --> fsm
+    %% salesAgent <--> fsm
+
+    cancelled --> salesActiveCleanup
+    failed --> salesActiveCleanup
+    finished --> salesActiveCleanup
+    errored --> salesActiveCleanup
+
+    marketFreeSlot --> contractsFreeSlot
+
+    payout --> marketFreeSlot
+    failed --> marketFreeSlot
+    cancelled --> marketFreeSlot
+
+```
