@@ -799,7 +799,12 @@ each sale reached [would be tracked](#tracking-latest-state-machine-state) in
 the `SalesOrder` object. On restart, the state of each of these `SalesOrders`
 would be restored, similar to how state is [restored for on chain filled
 slots](#restoring-on-chain-state). A new `SalesAgent` would be created for each
-local `SalesOrder`, starting in the state of the state machine that it left off in.
+local `SalesOrder`, starting in the state of the state machine that it left off
+in.
+
+Because the local `SalesOrder` state is getting restored, and there is a deterministic active
+cleanup at the conclusion of the state machine, corrective cleanup would no
+longer be needed.
 
 Careful consideration would need to be taken in each state machine step to
 ensure that any assumptions at each state are validated at the start, as it
