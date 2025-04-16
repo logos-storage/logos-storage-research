@@ -24,7 +24,7 @@ Anyone is invited to contribute to this document, as it is a [collective effort]
 | Tempering   | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
 | Tempering   | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
 | Repudiation | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
-| Repudiation | [Lazy host](#lazy-host)                                           | Service provider does not fill the slot’s content.                                            | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
+| Repudiation | [Lazy host](#lazy-host)                                           | Service provider does not fill the slot.                                                      | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
 
 ## Spoofing
 
