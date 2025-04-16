@@ -15,22 +15,22 @@ Anyone is invited to contribute to this document, as it is a [collective effort]
 
 ## Analysis
 
-| Category    | Threat                           | Description                                                                                   | Impact                                                                      | Mitigation                                       |
-| ----------- | -------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| Spoofing    | Phishing-Induced Spoofing        | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
-| Spoofing    | Same-Chain Replay                | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
-| Spoofing    | Cross-Chain Replay               | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
-| Spoofing    | Client Spoofing via API          | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
-| Tempering   | Fake proofs                      | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
-| Tempering   | `markProofAsMissing` re-entrancy | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
-| Repudiation | Denial of File Upload            | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
-| Repudiation | Lazy Host                        | Service provider does not fill the slot’s content.                                            | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
+| Category    | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                       |
+| ----------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| Spoofing    | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
+| Spoofing    | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
+| Spoofing    | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
+| Spoofing    | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
+| Tempering   | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
+| Tempering   | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
+| Repudiation | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
+| Repudiation | [Lazy host](#lazy-host)                                           | Service provider does not fill the slot’s content.                                            | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
 
 ## Spoofing
 
 Threat action aimed at impersonating users or storage providers to access or manipulate files and contracts in the network.
 
-### Phishing-Induced Spoofing
+### Phishing-Induced spoofing
 
 #### Scenario
 
@@ -170,7 +170,7 @@ Edit/view: https://cascii.app/3577b
 
 Include a unique, random `nonce` in the request data. This ensures signatures are unique per request, preventing reuse on the same chain. Codex’s current implementation includes this, fully mitigating the threat.
 
-### Cross-Chain Replay
+### Cross-Chain attack replays
 
 #### Scenario
 
@@ -241,7 +241,7 @@ Edit/view: https://cascii.app/d312b
 
 Implement EIP-712 to include chain-specific data in signed transaction, ensuring signatures are valid only on the intended chain and preventing unauthorized replays on other chains.
 
-### Client Spoofing via API
+### Client spoofing via API
 
 #### Scenario
 
@@ -475,7 +475,7 @@ Edit/view: https://cascii.app/70aed
 
 Make a clear statement that Codex is not responsible for such content and warn users of the potential risk for downloading an unknown CID.
 
-### Lazy Host
+### Lazy host
 
 #### Scenario
 
