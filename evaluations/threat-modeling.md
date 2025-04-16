@@ -15,16 +15,20 @@ Anyone is invited to contribute to this document, as it is a [collective effort]
 
 ## Analysis
 
-| Category  | Threat                           | Description                                                                                   | Impact                                                                      | Mitigation                                       |
-| --------- | -------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| Spoofing  | Phishing-Induced Spoofing        | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
-| Spoofing  | Same-Chain Replay                | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
-| Spoofing  | Cross-Chain Replay               | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
-| Spoofing  | Client Spoofing via API          | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
-| Tempering | Fake proofs                      | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
-| Tempering | `markProofAsMissing` re-entrancy | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
+| Category    | Threat                           | Description                                                                                   | Impact                                                                      | Mitigation                                       |
+| ----------- | -------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| Spoofing    | Phishing-Induced Spoofing        | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
+| Spoofing    | Same-Chain Replay                | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
+| Spoofing    | Cross-Chain Replay               | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
+| Spoofing    | Client Spoofing via API          | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
+| Tempering   | Fake proofs                      | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
+| Tempering   | `markProofAsMissing` re-entrancy | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
+| Repudiation | Denial of File Upload            | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
+| Repudiation | Lazy Host                        | Service provider does not fill the slot’s content.                                            | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
 
 ## Spoofing
+
+Threat action aimed at impersonating users or storage providers to access or manipulate files and contracts in the network.
 
 ### Phishing-Induced Spoofing
 
@@ -289,6 +293,8 @@ Educate the user to not use `0.0.0.0` for `api-bindaddr` unless he really knows 
 
 ## Tempering
 
+Threat action aimed at altering stored files, proofs, or smart contracts to disrupt the network.
+
 ### Fake proofs
 
 #### Scenario
@@ -418,3 +424,108 @@ Use OpenZeppelin’s `ReentrancyGuard` to block reentrant calls.
 
 [1]: https://owasp.org/www-community/Threat_Modeling_Process#stride
 [2]: https://cdn2.hubspot.net/hubfs/4598121/Content%20PDFs/VerSprite-PASTA-Threat-Modeling-Process-for-Attack-Simulation-Threat-Analysis.pdf
+
+## Repudiation
+
+Threat action aimed at denying responsibility for uploading files or agreeing to storage contracts in the network.
+
+### Denial of file upload
+
+#### Scenario
+
+A user uploads illegal content to Codex and later denies initiating the request, attempting to evade responsibility.
+
+```
+                  ──────
+                ─│      ─│
+               │           │
+               │ Anonymous │
+               │           │
+                ─│      ─│
+                  ──────
+                     │
+          Illegal    │
+          Content    │
+                     ▼
+           ┌───────────────────┐
+           │                   │
+           │   Codex protocol  │
+           │                   │
+           └───────────────────┘
+                     ▲
+                     │
+                     │
+                     │
+   ──────            │           ──────
+ ─│      ─│          │         ─│      ─│
+│           │        │        │           │
+│   User    │────────└────────│   User    │
+│           │                 │           │
+ ─│      ─│      Download      ─│      ─│
+   ──────                        ──────
+```
+
+Edit/view: https://cascii.app/70aed
+
+#### Impacts
+
+- **Reputation**: Codex could be used to distribute illegal content, leading to a loss of trust in the protocol.
+
+#### Mitigation
+
+Make a clear statement that Codex is not responsible for such content and warn users of the potential risk for downloading an unknown CID.
+
+### Lazy Host
+
+#### Scenario
+
+A storage provider reserves a slot, but waits to fill the slot hoping a better opportunity will arise, in which the reward earned in the new opportunity would be greater than the reward earned in the original slot.
+
+```
+      ──────                                                ──────
+    ─│      ─│                                            ─│      ─│
+   │           │                                         │           │
+   │   User    │                                         │   User    │
+   │           │                                         │           │
+    ─│      ─│                                            ─│      ─│
+      ──────                                                ──────
+         │                                                     ╷
+         │                                                     ╷
+         │                                                     ╷
+         │                                                     ╷
+         │                                                     ╷
+         │               ┌────────────────────┐                ╷
+         │               │                    │                ╷
+         └──────────────▶│   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+                         │                    │
+             ┌───────────└────────────────────┘╶╶╶╶╶╶╶╶╶╶╶╶┐
+             │                     ╷                       ╷
+Request 1    │                     ╷                       ╷   Request 2
+             │                     ╷                       ╷
+             │                     ╷ Fill Request 2 Slot 2 ╷
+             ▼                     ╷                       ▼
+  ┌────────────────────┐           ╷            ┌────────────────────┐
+  │Slot 1│Slot 2│Slot 3│           ╷            │Slot 1│Slot 2│Slot 3│
+  └────────────────────┘           ╷            └────────────────────┘
+             │                     ╷                       ╷
+             │                     ╷                       ╷
+             │                  ──────                     ╷
+             │              ─│──      ───│                 ╷
+             │               │           │                 ╷
+             │             │               │               ╷
+             └─────────────│   Lazy host   │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+                           │               │
+Reserve Request 1 Slot 2     │           │      Reserve Request 2 Slot 2
+                            ─│──      ───│
+                                ──────
+```
+
+Edit/view: https://cascii.app/69a55
+
+#### Impacts
+
+- **Availability**: The storage request will fail because the storage provider assigned to the slot decided not to fill it for a better opportunity, leaving the slot empty.
+
+#### Mitigation
+
+This attack is mitigated by allowing for multiple reservations per slot. All storage providers that have secured a reservation (capped at three) will race to fill the slot. Thus, if one or more storage providers that have reserved the slot decide to pursue other opportunities, the other storage providers that have reserved the slot will still be able to fill the slot.
