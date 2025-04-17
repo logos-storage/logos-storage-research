@@ -124,44 +124,46 @@ An attacker reuses a user’s signed transaction on the same chain to spoof addi
      │           │
     ─│──      ───│
         ──────
-           │
-           │
-           │
-           │    Storage request
-           │
-           │
-           │
+           ╷
+           ╷
+           ╷
+           ╷    Storage request
+           ╷
+           ╷
+           ╷
            ▼
 ┌──────────────────────┐
 │                      │
 │     Codex node       │
 │                      │
 └──────────────────────┘
-           │
-           │
-           │
+           ╷
+           ╷
+           ╷
            ▼
 ┌──────────────────────┐
 │                      │
-│  Request signature   │••••••••••••••
-│                      │             •
-└──────────────────────┘             •
-           │                         •
-           │                      ──────
-           │                    ─│      ─│
-           │                   │           │
-           │                   │ Attacker  │
-           │                   │           │
-           │                    ─│      ─│
-           ▼                      ──────
-┌──────────────────────┐             │
-│                      │             │
-│   Smart contract     │◀────────────┘
+│  Request signature   │╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+│                      │             ╷
+└──────────────────────┘             ╷
+           ╷                         ╷
+           ╷                         ▼
+           ╷                      ──────
+           ╷                    ─│      ─│
+           ╷                   │           │
+           ╷                   │ Attacker  │
+           ╷                   │           │
+           ╷                    ─│      ─│
+           ╷                      ──────
+           ▼                         ╷
+┌──────────────────────┐             ╷
+│                      │             ╷
+│   Smart contract     │◀╶╶╶╶╶╶╶╶╶╶╶╶┘
 │                      │
 └──────────────────────┘
 ```
 
-Edit/view: https://cascii.app/3577b
+Edit/view: https://cascii.app/b28b7
 
 #### Impacts
 
@@ -187,52 +189,52 @@ An attacker captures a user’s signed transaction from one chain and replays it
      │           │
     ─│──      ───│
         ──────
-           │
-           │
-           │
-           │    Storage request
-           │
-           │
-           │
+           ╷
+           ╷
+           ╷
+           ╷    Storage request
+           ╷
+           ╷
+           ╷
            ▼
 ┌──────────────────────┐
 │                      │
 │     Codex node       │
 │                      │
 └──────────────────────┘
-           │
-           │
-           │
+           ╷
+           ╷
+           ╷
            ▼
 ┌──────────────────────┐
 │                      │
 │  Request signature   │
 │                      │
 └──────────────────────┘
-           │
-           │
-           │
-           │
+           ╷
+           ╷
+           ╷
+           ╷
            ▼
-┌──────────────────────┐
-│                      │
-│   Smart contract     │                       ──────
-│                      │                     ─│      ─│
-└──────────────────────┘                    │           │
-           │                      ••••••••••│ Attacker  │───────
-           │                      •         │           │      │
-           │                      •          ─│      ─│        │
-           │                      •            ──────          │
-           ▼                      •                            │
-┌──────────────────────┐          •                            │       ┌──────────────────────┐
-│                      │          •                            │       │                      │
-│     Chain 1001       │•••••••••••                            └───────│      Chain 1002      │
-│                      │                                               │                      │
-└──────────────────────┘                                               └──────────────────────┘
-
+┌──────────────────────┐          ┌──────────────────────┐
+│                      │          │                      │
+│   Smart contract     │          │      Chain 1002      │
+│                      │          │                      │
+└──────────────────────┘          └──────────────────────┘
+           ╷                                 ▲
+           ╷                                 ╷
+           ╷                                 ╷
+           ╷                                 ╷
+           ▼                              ──────
+┌──────────────────────┐                ─│      ─│
+│                      │               │           │
+│     Chain 1001       │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶│  Attacker │
+│                      │               │           │
+└──────────────────────┘                ─│      ─│
+                                          ──────
 ```
 
-Edit/view: https://cascii.app/d312b
+Edit/view: https://cascii.app/9951e
 
 #### Impacts
 
@@ -249,40 +251,43 @@ Implement EIP-712 to include chain-specific data in signed transaction, ensuring
 A user starts a node locally and uses `api-bindaddr` with the value `0.0.0.0`. Worse, he confuses port forwarding and enable it for the REST API as well.
 
 ```
-                                                   ──────
-                                               ─│──      ───│
-                                                │           │
-                                              │               │
-                         ┌────────────────────│     User      │──────────────────┐
-                         │                    │               │                  │
-                         │                      │           │                    │
-                         │                     ─│──      ───│                    │
-                         │                         ──────                        │
-                         │                                                       │
-                         │ Starts with 0:0:0:0                                   │ Enables port forwarding for REST api
-                         │                                                       │
-                         │                                                       │
-                         │                                                       │
-                         │                                                       │
-                         ▼                                                       ▼
-              ┌──────────────────────┐                                ┌──────────────────────┐
-              │                      │                                │                      │
-              │      Codex node      │                                │      Codex node      │
-              │                      │                                │                      │
-              └──────────────────────┘                                └──────────────────────┘
-                         ▲                                                       ▲
-                         │                                                       │
-                         │                                                       │
-   ──────                │                                                       │                    ──────
- ─│      ─│              │                                                       │                  ─│      ─│
-│ Attacker  │            │                                                       │                 │           │
-│ on same   │────────────┘                                                       └─────────────────│ Attacker  │
-│ network   │                                                                                      │           │
- ─│      ─│                                                                                         ─│      ─│
-   ──────                                                                                             ──────
+                                     ──────
+                                 ─│──      ───│
+                                  │           │
+                                │               │
+           ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶│     User      │╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+           ╷                    │               │                  ╷
+           ╷                      │           │                    ╷
+           ╷                     ─│──      ───│                    ╷
+           ╷                         ──────                        ╷
+           ╷                                                       ╷
+           ╷ Starts with 0:0:0:0                  Enables port     ╷
+           ╷                                      forwarding for   ╷
+           ╷                                      REST api         ╷
+           ╷                                                       ╷
+           ╷                                                       ╷
+           ▼                                                       ▼
+┌──────────────────────┐                                ┌──────────────────────┐
+│                      │                                │                      │
+│      Codex node      │                                │      Codex node      │
+│                      │                                │                      │
+└──────────────────────┘                                └──────────────────────┘
+           ▲                                                       ▲
+           ╷                                                       ╷
+           ╷                                                       ╷
+           ╷                                                       ╷
+           ╷                                                       ╷
+           ╷                                                       ╷
+        ──────                                                  ──────
+      ─│      ─│                                              ─│      ─│
+     │  Attacker │                                           │           │
+     │  on same  │                                           │ Attacker  │
+     │  network  │                                           │           │
+      ─│      ─│                                              ─│      ─│
+        ──────                                                  ──────
 ```
 
-Edit/view: https://cascii.app/28692
+Edit/view: https://cascii.app/b762d
 
 #### Impacts
 
@@ -310,44 +315,44 @@ After the Codex contract starts, a storage provider stops storing the data and a
       │           │
        ─│      ─│
          ──────
-            │
-  Storage   │
-  Request   │
-            │
+            ╷
+  Storage   ╷
+  Request   ╷
+            ╷
             ▼
 ┌────────────────────────┐
 │                        │
-│      Codex network     │──────────────┐
-│                        │              │
-└────────────────────────┘              │
-            │                           │
-            │                           │
-            │         Delete the file   │
-            │         Submit fake proof │
-            │                           │
-            │                           │
-            │                           │
-            │                        ──────
-            │                      ─│      ─│
-            │                     │ Storage   │
-            │                     │ Provider  │
-            │                     │           │
-            │                      ─│      ─│
-            │                        ──────
-            │                           ▲
-            │                           •
-            │                           •
-            │                           •
-            │                           •
-            │                           •
-            │                           •
-            ▼                           •
- ┌────────────────────┐                 •
- │Slot 1│Slot 2│Slot 3│••••••••••••••••••
+│      Codex network     │◀╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+│                        │              ╷
+└────────────────────────┘              ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷         Delete the file   ╷
+            ╷         Submit fake proof ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷                        ──────
+            ╷                      ─│      ─│
+            ╷                     │           │
+            ╷                     │    SP     │
+            ╷                     │           │
+            ╷                      ─│      ─│
+            ╷                        ──────
+            ╷                           ▲
+            ╷                           ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷                           ╷
+            ╷                           ╷
+            ▼                           ╷
+ ┌────────────────────┐                 ╷
+ │Slot 1│Slot 2│Slot 3│╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
  └────────────────────┘
 ```
 
-Edit/view: https://cascii.app/629b5
+Edit/view: https://cascii.app/9de0e
 
 #### Impacts
 
@@ -384,9 +389,9 @@ Reentrancy in Marketplace.markProofAsMissing(SlotId,Periods.Period) (contracts/M
                            │           │
                             ─│      ─│
                               ──────
-                                 │
-                        Storage  │
-                        Request  │
+                                 ╷
+                        Storage  ╷
+                        Request  ╷
                                  ▼
                    ┌───────────────────────────┐
 Re-entrency        │                           │
@@ -395,23 +400,23 @@ Re-entrency        │                           │
        ╷           │                           │
        ╷           │                           │
        ╷           ▲───────────────────────────┘
-       ╷           ╷             │
-       ╷           ╷             │
-    ──────         ╷             │                     ──────
-  ─│      ─│       ╷             │                   ─│      ─│
- │           │     ╷             │                  │           │
- │ Validator │╶╶╶╶╶┘             │                  │    SP     │
- │           │                   │                  │           │
-  ─│      ─│                     │                   ─│      ─│
-    ──────                       │                     ──────
-       │                         │                        ▲
-       │                         ▼                        •
-       │              ┌────────────────────┐              •
-       └──────────────│Slot 1│Slot 2│Slot 3│•••••••••••••••
+       ╷           ╷             ╷
+       ╷           ╷             ╷
+    ──────         ╷             ╷                     ──────
+  ─│      ─│       ╷             ╷                   ─│      ─│
+ │           │     ╷             ╷                  │           │
+ │ Validator │╶╶╶╶╶┘             ╷                  │    SP     │
+ │           │                   ╷                  │           │
+  ─│      ─│                     ╷                   ─│      ─│
+    ──────                       ╷                     ──────
+       ▲                         ╷                        ▲
+       ╷                         ▼                        ╷
+       ╷              ┌────────────────────┐              ╷
+       └╶╶╶╶╶╶╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 3│╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                       └────────────────────┘
 ```
 
-Edit/view: https://cascii.app/5ead7
+Edit/view: https://cascii.app/0e182
 
 #### Impacts
 
@@ -444,9 +449,9 @@ A user uploads illegal content to Codex and later denies initiating the request,
                │           │
                 ─│      ─│
                   ──────
-                     │
-          Illegal    │
-          Content    │
+                     ╷
+          Illegal    ╷
+          Content    ╷
                      ▼
            ┌───────────────────┐
            │                   │
@@ -454,19 +459,19 @@ A user uploads illegal content to Codex and later denies initiating the request,
            │                   │
            └───────────────────┘
                      ▲
-                     │
-                     │
-                     │
-   ──────            │           ──────
- ─│      ─│          │         ─│      ─│
-│           │        │        │           │
-│   User    │────────└────────│   User    │
+                     ╷
+                     ╷
+                     ╷
+   ──────            ╷           ──────
+ ─│      ─│          ╷         ─│      ─│
+│           │        ╷        │           │
+│   User    │╶╶╶╶╶╶╶╶└╶╶╶╶╶╶╶╶│   User    │
 │           │                 │           │
  ─│      ─│      Download      ─│      ─│
    ──────                        ──────
 ```
 
-Edit/view: https://cascii.app/70aed
+Edit/view: https://cascii.app/5b9a9
 
 #### Impacts
 
@@ -492,30 +497,30 @@ to fill the second slot.
                      │           │
                       ─│      ─│                       ──────
                         ──────                       ─│      ─│
-                           │                        │Better     │
-                           │                        │Opportunity│
-                           │                        │           │
-                           │                         ─│      ─│
-                           │                           ──────
-                 ┌────────────────────┐                   │
-                 │                    │                   │
-                 │   Codex network    │◀──────────────────┘
+                           ╷                        │Better     │
+                           ╷                        │Opportunity│
+                           ╷                        │           │
+                           ╷                         ─│      ─│
+                           ▼                           ──────
+                 ┌────────────────────┐                   ╷
+                 │                    │                   ╷
+                 │   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                  │                    │
-                 └─────────────────────────────────────────────┐
-                           │                                   │
-                Request 1  │                                   │
-                           │                                   │
-                           │                                   │
-                           ▼                                   │
-                ┌────────────────────┐                         │
-                │Slot 1│Slot 2│Slot 3│                         │
-                └────────────────────┘                         │
-                           ▲                                   │
-                           │                                   │
-Fill Request 1 Slot 2      │                                   │
-                           │                                   │
-                        ──────       Abandon Request 1 Slot 2  │
-                    ─│──      ───│   to fill Request 2 Slot 2  │
+                 └────────────────────╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+                           ╷                                   ╷
+                Request 1  ╷                                   ╷
+                           ╷                                   ╷
+                           ╷                                   ╷
+                           ▼                                   ╷
+                ┌────────────────────┐                         ╷
+                │Slot 1│Slot 2│Slot 3│                         ╷
+                └────────────────────┘                         ╷
+                           ▲                                   ╷
+                           ╷                                   ╷
+Fill Request 1 Slot 2      ╷                                   ╷
+                           ╷                                   ╷
+                        ──────       Abandon Request 1 Slot 2  ╷
+                    ─│──      ───│   to fill Request 2 Slot 2  ╷
                      │           │                             ▼
                    │               │                ┌────────────────────┐
                    │  Clever host  │────────────────│Slot 1│Slot 2│Slot 3│
@@ -525,7 +530,7 @@ Fill Request 1 Slot 2      │                                   │
                         ──────
 ```
 
-Edit/view: https://cascii.app/267a1
+Edit/view: https://cascii.app/db2da
 
 #### Impacts
 
@@ -550,55 +555,47 @@ Information disclosure occurs when private or sensitive information such as user
 A user uploads a confidential file to Codex. Storage providers store encrypted slots of the file. Without encryption, storage providers could agree to gather slots and reassemble the full content.
 
 ```
-                              ──────
-                            ─│      ─│
-                           │           │
-                           │   User    │
-                           │           │
-                            ─│      ─│
-                              ──────
-                                 │
-                                 │
-                                 │
-                                 │
-                                 ▼
-                       ┌────────────────────┐
-                       │                    │
-                       │   Codex network    │
-                       │                    │
-                       └────────────────────┘
-                                 │
-                                 │
-                                 │
-                                 │
-                                 ▼
-                      ┌────────────────────┐
-        ┌────────────▶│Slot 1│Slot 2│Slot 3│◀─────────────┐
-        │             └────────────────────┘              │
-        │                        ▲                        │
-        │                        │                        │
-        │                        │                        │
-        │                        │                        │
-     ──────                   ──────                   ──────
- ─│──      ───│           ─│──      ───│           ─│──      ───│
-  │           │            │           │            │           │
-│               │        │               │        │               │
-│     SP 2      │        │     SP 1      │        │     SP 3      │
-│               │        │               │        │               │
-  │           │            │           │            │           │
- ─│──      ───│           ─│──      ───│           ─│──      ───│
-     ──────                   ──────                   ──────
-        │                        │                        │
-        │                        │                        │
-        │                        ▼                        │
-        │             ┌──────────────────────┐            │
-        │             │                      │            │
-        └────────────▶│    Original file     │◀───────────┘
-                      │                      │
-                      └──────────────────────┘
+                        ──────
+                      ─│      ─│
+                     │           │
+                     │   User    │
+                     │           │
+                      ─│      ─│                       ──────
+                        ──────                       ─│      ─│
+                           ╷                        │Better     │
+                           ╷                        │Opportunity│
+                           ╷                        │           │
+                           ╷                         ─│      ─│
+                           ▼                           ──────
+                 ┌────────────────────┐                   ╷
+                 │                    │                   ╷
+                 │   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+                 │                    │
+                 └────────────────────╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+                           ╷                                   ╷
+                Request 1  ╷                                   ╷
+                           ╷                                   ╷
+                           ╷                                   ╷
+                           ▼                                   ╷
+                ┌────────────────────┐                         ╷
+                │Slot 1│Slot 2│Slot 3│                         ╷
+                └────────────────────┘                         ╷
+                           ╷                                   ╷
+                           ╷                                   ╷
+Fill Request 1 Slot 2      ╷                                   ╷
+                           ▼                                   ╷
+                        ──────       Abandon Request 1 Slot 2  ╷
+                    ─│──      ───│   to fill Request 2 Slot 2  ╷
+                     │           │                             ▼
+                   │               │                ┌────────────────────┐
+                   │  Clever host  │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 3│
+                   │               │                └────────────────────┘
+                     │           │
+                    ─│──      ───│
+                        ──────
 ```
 
-Edit/view: https://cascii.app/3213e
+Edit/view: https://cascii.app/ef5ab
 
 #### Impacts
 
@@ -625,38 +622,38 @@ A storage provider reserves a slot, but waits to fill the slot hoping a better o
    │           │                                         │           │
     ─│      ─│                                            ─│      ─│
       ──────                                                ──────
-         │                                                     ╷
-         │                                                     ╷
-         │                                                     ╷
-         │                                                     ╷
-         │                                                     ╷
-         │               ┌────────────────────┐                ╷
-         │               │                    │                ╷
-         └──────────────▶│   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+         ╷                                                     ╷
+         ╷                                                     ╷
+         ╷                                                     ╷
+         ╷                                                     ╷
+         ╷                                                     ╷
+         ╷               ┌────────────────────┐                ╷
+         ╷               │                    │                ╷
+         └╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶│   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                          │                    │
-             ┌───────────└────────────────────┘╶╶╶╶╶╶╶╶╶╶╶╶┐
-             │                     ╷                       ╷
-Request 1    │                     ╷                       ╷   Request 2
-             │                     ╷                       ╷
-             │                     ╷ Fill Request 2 Slot 2 ╷
+             ┌╶╶╶╶╶╶╶╶╶╶╶└────────────────────┘╶╶╶╶╶╶╶╶╶╶╶╶┐
+             ╷                     ╷                       ╷
+Request 1    ╷                     ╷                       ╷   Request 2
+             ╷                     ╷                       ╷
+             ╷                     ╷ Fill Request 2 Slot 2 ╷
              ▼                     ╷                       ▼
   ┌────────────────────┐           ╷            ┌────────────────────┐
   │Slot 1│Slot 2│Slot 3│           ╷            │Slot 1│Slot 2│Slot 3│
   └────────────────────┘           ╷            └────────────────────┘
-             │                     ╷                       ╷
-             │                     ╷                       ╷
-             │                  ──────                     ╷
-             │              ─│──      ───│                 ╷
-             │               │           │                 ╷
-             │             │               │               ╷
-             └─────────────│   Lazy host   │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+             ╷                     ╷                       ╷
+             ╷                     ╷                       ╷
+             ╷                  ──────                     ╷
+             ╷              ─│──      ───│                 ╷
+             ╷               │           │                 ╷
+             ╷             │               │               ╷
+             └╶╶╶╶╶╶╶╶╶╶╶╶▶│   Lazy host   │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                            │               │
 Reserve Request 1 Slot 2     │           │      Reserve Request 2 Slot 2
                             ─│──      ───│
                                 ──────
 ```
 
-Edit/view: https://cascii.app/69a55
+Edit/view: https://cascii.app/6144e
 
 #### Impacts
 
