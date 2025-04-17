@@ -35,6 +35,7 @@ Anyone is invited to contribute to this document, as it is a
 | Repudiation            | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
 | Repudiation            | [Clever host](#clever-host)                                       | Storage provider abandon its duties for a better opportunity.                                 | Reduces network reliability.                                                | Slash collateral and reward repairing slot.      |
 | Information disclosure | [Uploaded files exposed](#uploaded-files-exposed)                 | Non encrypted files can be reconstructed.                                                     | Reputation and privacy exposure.                                            | Add encryption layer.                            |
+| Elevation of privilege | [Exploring a vulnerability](#exploring-a-vulnerability)           | The attacker exploits a vulnerability to take over the smart contracts.                       | System Disruption.                                                          | Upgradable contracts and / or admin role.        |
 
 ## Spoofing
 
@@ -724,3 +725,71 @@ All storage providers that have secured a reservation (capped at three) will rac
 Thus, if one or more storage providers that have reserved the slot decide to
 pursue other opportunities, the other storage providers that have reserved the slot will
 still be able to fill the slot.
+
+## Elevation of privilege
+
+Threat action intending to gain privileged access to resources in order to gain unauthorized access
+to information or to compromise a system.
+
+### Exploring a vulnerability
+
+#### Scenario
+
+An attacker finds a vulnerability in Codex’s smart contract after it’s deployed. Anyone can call it.
+The attacker uses this to change deal terms in their favor, taking control of the protocol.
+
+```
+                         ┌────────────────────────────┐
+                         │                            │
+                         │           Codex            │
+                         │                            │
+                         └────────────────────────────┘
+                                       ╷
+                                       ╷
+                                       ╷   Deploy without ownership
+                                       ╷
+                                       ╷
+  Take control of the s                ▼
+  mart contracts         ┌───────────────────────────┐
+                         │                           │
+        ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶│       Smart contracts     │
+        ╷                │                           │
+        ╷                ╷───────────────────────────┘
+        ╷                ╷             ▲
+        ╷                ╷             ╷
+        ╷                ╷             ╷
+        ╷                ╷             ╷
+     ──────              ╷             ╷
+ ─│──      ───│          ╷             ╷
+  │           │          ╷             ╷
+│               │        ╷             ╷
+│   Attacker    │◀╶╶╶╶╶╶╶┘             ╷
+│               │                      ╷
+  │           │      Manipulates       ╷
+ ─│──      ───│      incoming storage  ╷
+     ──────          requests          ╷
+                                       ╷
+                                       ╷
+                                       ╷
+                                    ──────
+                                ─│──      ───│
+                                 │           │
+                               │               │
+                               │Storage request│
+                               │               │
+                                 │           │
+                                ─│──      ───│
+                                    ──────
+```
+
+Edit/view: https://cascii.app/23869
+
+#### Impacts
+
+- **Financial Loss**: Attackers could tweak deals to steal funds or stop payments.
+- **System Disruption**: The integrity of the Codex protocol is compromised, leading to a loss of trust.
+
+#### Mitigation
+
+Use upgradable contracts to allow for future fixes. Additionally, implement temporary admin roles
+requiring multiple approvals for changing critical settings.
