@@ -15,16 +15,17 @@ Anyone is invited to contribute to this document, as it is a [collective effort]
 
 ## Analysis
 
-| Category    | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                       |
-| ----------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| Spoofing    | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
-| Spoofing    | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
-| Spoofing    | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
-| Spoofing    | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
-| Tempering   | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
-| Tempering   | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
-| Repudiation | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
-| Repudiation | [Lazy host](#lazy-host)                                           | Service provider does not fill the slot.                                                      | Reduces network reliability.                                                | Allow multiple reservations per slot.            |
+| Category               | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                       |
+| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| Spoofing               | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
+| Spoofing               | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
+| Spoofing               | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
+| Spoofing               | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
+| Tempering              | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
+| Tempering              | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
+| Repudiation            | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
+| Repudiation            | [Clever host](#clever-host)                                       | Storage provider abandon its duties for a better opportunity.                                 | Reduces network reliability.                                                | Slash collateral and reward repairing slot.      |
+| Information disclosure | [Uploaded files exposed](#uploaded-files-exposed)                 | Non encrypted files can be reconstructed.                                                     | Reputation and privacy exposure.                                            | Add encryption layer.                            |
 
 ## Spoofing
 
@@ -351,7 +352,7 @@ Edit/view: https://cascii.app/629b5
 #### Impacts
 
 - **Financial**: Attackers attempt to earn contract rewards at the end of the contract without storing the file.
-- **Availability**: The file becomes unavailable from that storage provider, reducing network reliability.
+- **Availability**: The slot becomes unavailable from that storage provider, reducing network reliability.
 
 #### Mitigation
 
@@ -474,6 +475,141 @@ Edit/view: https://cascii.app/70aed
 #### Mitigation
 
 Make a clear statement that Codex is not responsible for such content and warn users of the potential risk for downloading an unknown CID.
+
+### Clever host
+
+#### Scenario
+
+In this attack, an SP could fill a slot, and while fulfilling its duties, see
+that a better opportunity has arisen, and abandon its duties in the first slot
+to fill the second slot.
+
+```
+                        ──────
+                      ─│      ─│
+                     │           │
+                     │   User    │
+                     │           │
+                      ─│      ─│                       ──────
+                        ──────                       ─│      ─│
+                           │                        │Better     │
+                           │                        │Opportunity│
+                           │                        │           │
+                           │                         ─│      ─│
+                           │                           ──────
+                 ┌────────────────────┐                   │
+                 │                    │                   │
+                 │   Codex network    │◀──────────────────┘
+                 │                    │
+                 └─────────────────────────────────────────────┐
+                           │                                   │
+                Request 1  │                                   │
+                           │                                   │
+                           │                                   │
+                           ▼                                   │
+                ┌────────────────────┐                         │
+                │Slot 1│Slot 2│Slot 3│                         │
+                └────────────────────┘                         │
+                           ▲                                   │
+                           │                                   │
+Fill Request 1 Slot 2      │                                   │
+                           │                                   │
+                        ──────       Abandon Request 1 Slot 2  │
+                    ─│──      ───│   to fill Request 2 Slot 2  │
+                     │           │                             ▼
+                   │               │                ┌────────────────────┐
+                   │  Clever host  │────────────────│Slot 1│Slot 2│Slot 3│
+                   │               │                └────────────────────┘
+                     │           │
+                    ─│──      ───│
+                        ──────
+```
+
+Edit/view: https://cascii.app/267a1
+
+#### Impacts
+
+- **Availability**: The slot becomes unavailable from that storage provider, reducing network reliability.
+
+#### Mitigation
+
+This attack is mitigated by the storage provider losing its request collateral for the first
+slot once it is abandoned. Additionally, once the storage provider fills the first slot, it
+will accrue rewards over time that will not be paid out until the request
+successfully completes. These rewards act as another disincentive for the storage
+provider to abandon the slot.
+
+## Information disclosure
+
+Information disclosure occurs when private or sensitive information such as user data, file contents, or system secrets is unintentionally or maliciously revealed to unauthorized parties.
+
+### Uploaded files exposed
+
+#### Scenario
+
+A user uploads a confidential file to Codex. Storage providers store encrypted slots of the file. Without encryption, storage providers could agree to gather slots and reassemble the full content.
+
+```
+                              ──────
+                            ─│      ─│
+                           │           │
+                           │   User    │
+                           │           │
+                            ─│      ─│
+                              ──────
+                                 │
+                                 │
+                                 │
+                                 │
+                                 ▼
+                       ┌────────────────────┐
+                       │                    │
+                       │   Codex network    │
+                       │                    │
+                       └────────────────────┘
+                                 │
+                                 │
+                                 │
+                                 │
+                                 ▼
+                      ┌────────────────────┐
+        ┌────────────▶│Slot 1│Slot 2│Slot 3│◀─────────────┐
+        │             └────────────────────┘              │
+        │                        ▲                        │
+        │                        │                        │
+        │                        │                        │
+        │                        │                        │
+     ──────                   ──────                   ──────
+ ─│──      ───│           ─│──      ───│           ─│──      ───│
+  │           │            │           │            │           │
+│               │        │               │        │               │
+│     SP 2      │        │     SP 1      │        │     SP 3      │
+│               │        │               │        │               │
+  │           │            │           │            │           │
+ ─│──      ───│           ─│──      ───│           ─│──      ───│
+     ──────                   ──────                   ──────
+        │                        │                        │
+        │                        │                        │
+        │                        ▼                        │
+        │             ┌──────────────────────┐            │
+        │             │                      │            │
+        └────────────▶│    Original file     │◀───────────┘
+                      │                      │
+                      └──────────────────────┘
+```
+
+Edit/view: https://cascii.app/3213e
+
+#### Impacts
+
+- **Reputation**: Codex cannot guarantee confidentiality, leading to a loss of trust in the protocol.
+- **Privacy**: Exposure of sensitive user data could violate privacy, potentially resulting in legal or regulatory consequences.
+
+#### Mitigation
+
+Implement encryption to ensure that only authorized users can decrypt and access the file contents.
+
+## Denial of service
 
 ### Lazy host
 
