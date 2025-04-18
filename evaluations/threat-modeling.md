@@ -24,18 +24,25 @@ Anyone is invited to contribute to this document, as it is a
 
 ## Analysis
 
-| Category               | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                       |
-| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| Spoofing               | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                 |
-| Spoofing               | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.          |
-| Spoofing               | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                               |
-| Spoofing               | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full access.                                                           | Educate users.                                   |
-| Tempering              | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.          |
-| Tempering              | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern. |
-| Repudiation            | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                    |
-| Repudiation            | [Clever host](#clever-host)                                       | Storage provider abandon its duties for a better opportunity.                                 | Reduces network reliability.                                                | Slash collateral and reward repairing slot.      |
-| Information disclosure | [Uploaded files exposed](#uploaded-files-exposed)                 | Non encrypted files can be reconstructed.                                                     | Reputation and privacy exposure.                                            | Add encryption layer.                            |
-| Elevation of privilege | [Exploring a vulnerability](#exploring-a-vulnerability)           | The attacker exploits a vulnerability to take over the smart contracts.                       | System Disruption.                                                          | Upgradable contracts and / or admin role.        |
+| Category               | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                                 |
+| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Spoofing               | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                           |
+| Spoofing               | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.                    |
+| Spoofing               | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                                         |
+| Spoofing               | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full API access.                                                       | Educate users.                                             |
+| Tampering              | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.                    |
+| Tampering              | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern.           |
+| Repudiation            | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                              |
+| Repudiation            | [Clever host](#clever-host)                                       | Storage provider abandon its duties for a better opportunity.                                 | Reduces network reliability.                                                | Slash collateral and reward repairing slot.                |
+| Information disclosure | [Uploaded files exposed](#uploaded-files-exposed)                 | Non encrypted files can be reconstructed.                                                     | Reputation and privacy exposure.                                            | Add encryption layer.                                      |
+| Elevation of privilege | [Exploring a vulnerability](#exploring-a-vulnerability)           | The attacker exploits a vulnerability to take over the smart contracts.                       | System Disruption.                                                          | Upgradable contracts and / or admin role.                  |
+| Denial of service      | [Lazy host](#lazy-host)                                           | Host reserves a slot, but doesn't fill it                                                     | System Disruption.                                                          | Multiple reservations.                                     |
+| Denial of service      | [Lazy host](#lazy-host)                                           | Host reserves a slot, but doesn't fill it                                                     | System Disruption.                                                          | Multiple reservations.                                     |
+| Overload attack        | [Overload attack](#overload-attack)                               | Massive small requests to overload validators.                                                | System Disruption.                                                          | Client doesn't release content on the network.             |
+| Denial of service      | [Lazy Client](#lazy-client)                                       | Starting request fees.                                                                        | System Disruption.                                                          | Transaction cost                                           |
+| Denial of service      | [Censoring](#censoring)                                           | Acts like a lazy host for specific CIDs that it tries to censor fees.                         | System Disruption.                                                          | Dataset and CID and be rebuilt by other storage providers. |
+| Denial of service      | [Greedy](#greedy)                                                 | Storage provider tries to fill multiple slots in a request                                    | System Disruption.                                                          | Expanding window mechanism                                 |
+| Denial of service      | [Sticky](#sticky)                                                 | Storage provider tries to fill the same slot in a contract renewal.                           | System Disruption.                                                          | Expanding window mechanism                                 |
 
 ## Spoofing
 
@@ -48,7 +55,7 @@ files and contracts in the network.
 
 When starting a Codex node, the user must load his private key to pay for initiating new
 storage requests. This private key is loaded into memory, and there is no authentication
-process to use the REST API. An attacker could reach the user via email phishing,
+process to use the API. An attacker could reach the user via email phishing,
 pretending to be from Codex. The email might redirect to a malicious website or include a
 form that, upon the user's click, triggers a request to the Codex node to create a new storage request.
 
@@ -324,7 +331,7 @@ Edit/view: https://cascii.app/b762d
 
 #### Impacts
 
-- **Node full control**: Attackers can send unauthorized API requests, draining funds
+- **Node full API control**: Attackers can send unauthorized API requests, draining funds
   or storing illegal content.
 
 #### Mitigation
@@ -333,7 +340,7 @@ Educate the user to not use `0.0.0.0` for `api-bindaddr` unless he really knows 
 is doing and not enabling the port forwarding for the REST API. A warning during the
 startup could be displayed if `api-bindaddr` is not bound to localhost.
 
-## Tempering
+## Tampering
 
 Threat action aimed at altering stored files, proofs, or smart contracts to disrupt
 the network.
@@ -342,8 +349,9 @@ the network.
 
 #### Scenario
 
-After the Codex contract starts, a storage provider stops storing the data and attempts
-to send fake proofs, claiming they are still hosting the content, using initial data received.
+In the case of the proof verification is weak and proofs can be submitted and verified easily,
+a storage provider could stop storing the data and attempts to send fake proofs, claiming they
+are still hosting the content, using initial data received.
 
 ```
          ──────
@@ -530,7 +538,8 @@ Edit/view: https://cascii.app/5b9a9
 
 #### Mitigation
 
-Make a clear statement that Codex is not responsible for such content and warn users of the potential risk for downloading an unknown CID.
+Make a clear statement that Codex is not responsible for such content and warn users of the
+potential risk for downloading an unknown CID.
 
 ### Clever host
 
@@ -605,7 +614,7 @@ file contents, or system secrets is unintentionally or maliciously revealed to u
 
 #### Scenario
 
-A user uploads a confidential file to Codex. Storage providers store encrypted slots
+A user uploads a confidential file to Codex. Storage providers store non encrypted slots
 of the file. Without encryption, storage providers could agree to gather slots and
 reassemble the full content.
 
@@ -669,6 +678,9 @@ Implement encryption to ensure that only authorized users can decrypt and access
 
 #### Scenario
 
+In the case of a single reservation system, matching storage providers are assigned to
+slot reservation by a 1-1 relation, meaning that there is one storage provider
+for one reservation.
 A storage provider reserves a slot, but waits to fill the slot hoping a better
 opportunity will arise, in which the reward earned in the new opportunity would be
 greater than the reward earned in the original slot.
@@ -716,7 +728,8 @@ Edit/view: https://cascii.app/6144e
 
 #### Impacts
 
-- **Availability**: The storage request will fail because the storage provider assigned to the slot decided not to fill it for a better opportunity, leaving the slot empty.
+- **Availability**: The storage request will fail because the storage provider assigned to the slot
+  decided not to fill it for a better opportunity, leaving the slot empty.
 
 #### Mitigation
 
@@ -725,6 +738,152 @@ All storage providers that have secured a reservation (capped at three) will rac
 Thus, if one or more storage providers that have reserved the slot decide to
 pursue other opportunities, the other storage providers that have reserved the slot will
 still be able to fill the slot.
+
+### Overload attack
+
+#### Scenario
+
+An attacker runs many small requests that generate high-volume transactions, overwhelming
+validators and delaying their ability to detect missed proofs.
+
+```
+                        ──────
+                    ─│──      ───│
+                     │           │
+                   │               │
+                   │   Attacker    │
+                   │               │
+                     │           │
+                    ─│──      ───│
+                        ──────
+                           ╷
+                           ╷    Small requests
+                           ▼
+          ┌─────────────────────────────────┐
+          │R1│R2│R3│R4│R5│R5│R6│R7│R8│R9│R10│
+          └─────────────────────────────────┘
+            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷   │
+            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷   │
+            ╷  ╷  └╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘  ╷   │
+            ╷  ╷           ╷           ╷   │
+            ╷  ╷           ▼           ╷   │
+            ╷  └▶┌────────────────────◀┘   │
+            ╷    │                    │    │
+            └╶╶╶▶│       Codex        │◀───┘
+                 │                    │
+                 └────────────────────┘
+                           ╷
+                           ╷
+                           ╷
+                           ╷
+     ──────                ╷               ──────
+ ─│──      ───│            ╷           ─│──      ───│
+  │           │    R1      ╷      R2    │           │
+│               │          ╷          │               │
+│   Validator   │ ◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶  │   Validator   │
+│               │                     │               │
+  │           │                         │           │
+ ─│──      ───│                        ─│──      ───│
+     ──────                                ──────
+
+                Validators are too busy
+```
+
+Edit/view: https://cascii.app/b6a31
+
+#### Impacts
+
+- **System Disruption**: Hosts might temporarily avoid penalties for not serving content,
+  reducing file availability and causing users to lose trust in the Codex protocol.
+
+#### Mitigation
+
+Codex requires a small fee for each request, which helps mitigate this threat.
+Other mitigations are also possible: optimizing the validation process to make proof
+checks faster, limiting the number of storage requests per IP, and setting a minimum
+file upload size.
+
+### Lazy Client
+
+#### Scenario
+
+A client may try to disrupt the network by making storage requests but never providing the
+actual data to storage providers who are trying to fill the storage slots.
+
+#### Impacts
+
+- **Wasting Resources**: Storage providers waste their resources trying to store data that
+  never gets provided, making the network less efficient.
+
+#### Mitigation
+
+The transaction cost for each request helps prevent this attack. The more requests the attacker
+makes, the higher the cost will be because of rising gas fees and block fill rates.
+This makes it expensive for attackers to keep sending fake requests and spamming the network.
+
+### Censoring
+
+#### Scenario
+
+A Storage provider tries to block access to specific CIDsfrom the network in order to censor
+certain content. This could also happen during a repair process when a service provider tries
+to stop a freed slot from being repaired by not sharing the necessary data.
+
+#### Impacts
+
+- **Censored Content**: The service prodivder may stop users from accessing certain data,
+  preventing them from retrieving content they need.
+- **Data Unavailability**: If the service provider tries to block data during a repair,
+  it could stop the network from restoring missing files, making the data unavailable.
+- **Trust Issues**: Users may lose trust in the network if they believe that some service providers
+  can block or censor content.
+
+#### Mitigation
+
+Even if one SP withholds certain content, the dataset and the blocked CID can be rebuilt using
+chunks from other service providers. This means that the censored CID can still be accessed
+through other nodes, making the attack less successful.
+
+### Greedy
+
+#### Scenario
+
+A storage provider tries to fill multiple slots in a single request. This can be harmful because
+it allows a single SP to control more resources than intended.
+
+#### Impacts
+
+- **Resource Control**: Reducing fairness and spreading resources not reparted.
+- **Network Inefficiency**: Limit the opportunity for other SPs to participate, affecting the
+  overall efficiency of the network.
+
+#### Mitigation
+
+The expanding window mechanism helps prevent this attack. It makes sure that no single SP can fill
+all the slots in a request by gradually opening up space for other service providers.
+This works most of the time, but it may not be fully effective once the request is about to expire.
+
+### Sticky
+
+#### Scenario
+
+A storage provider tries to keep control of a storage slot during a contract renewal. The SP does
+this by withholding the data from other SPs and waiting until the expanding window allows them to
+fill the slot again. Since they already have the data, they can act faster than others and fill
+the slot before anyone else.
+
+#### Impacts
+
+- **Unfair Advantage**: The service provider gains an unfair advantage by being able to renew the
+  contract without giving other SPs a fair chance.
+- **Network Centralization**: Llead to fewer service providers handling more data, making the network
+  less balanced.
+
+#### Mitigation
+
+The attack is difficult and unlikely to work unless the service provider controls a large part of the
+network. The expanding window mechanism also helps by spreading out control and giving other SPs a
+fair chance to fill the slots.
 
 ## Elevation of privilege
 
@@ -736,7 +895,7 @@ to information or to compromise a system.
 #### Scenario
 
 An attacker finds a vulnerability in Codex’s smart contract after it’s deployed. Anyone can call it.
-The attacker uses this to change deal terms in their favor, taking control of the protocol.
+The attacker uses this to change deal terms in their favor, taking over the funds.
 
 ```
                          ┌────────────────────────────┐
