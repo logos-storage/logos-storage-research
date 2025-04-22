@@ -10,52 +10,60 @@ serve as a starting point for directives in a security audit. The scope includes
 
 ## Methodology
 
-The [STRIDE][1] framework is used due to its simplicity and the ability to quickly build
-an analysis.  
-The [PASTA][2] framework was considered but is more business-oriented and suited for mature
-projects. Additionally, its process is heavier than STRIDE's.
+The STRIDE framework is
+used due to its simplicity and ability to quickly build an analysis.
+The PASTA framework
+was considered, but it is more business-oriented and suited for mature projects.
+Additionally, its process is heavier than STRIDE's.
 
-Threat modeling is an iterative process, requiring constant updates as features are added or
-modified in the codebase. Documenting potential security vulnerabilities helps developers to
-keep them in mind during the code implementation.
+Threat modeling is an iterative process that requires constant updates as features are added or
+modified in the codebase. Documenting potential security vulnerabilities helps developers
+keep them in mind during code implementation.
+
+DREAD is used as a risk assessment model to evaluate and prioritize security threats. Scores range is from 0 (low) to 10 (high).
 
 Anyone is invited to contribute to this document, as it is a
-[collective effort](https://www.threatmodelingmanifesto.org) rather than a one-person task.
+collective effort rather than a one-person task.
+
+### References
+
+[Manifesto](https://www.threatmodelingmanifesto.org)  
+[STRIDE](https://owasp.org/www-community/Threat_Modeling_Process#stride)  
+[PASTA](https://cdn2.hubspot.net/hubfs/4598121/Content%20PDFs/VerSprite-PASTA-Threat-Modeling-Process-for-Attack-Simulation-Threat-Analysis.pdf)  
+[DREAD](https://threat-modeling.com/dread-threat-modeling)
 
 ## Analysis
 
-| Category               | Threat                                                            | Description                                                                                   | Impact                                                                      | Mitigation                                                 |
-| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Spoofing               | [Phishing-Induced spoofing](#phishing-induced-spoofing)           | Exploits the private key loaded directly into the app via phishing to send unwanted requests. | Draining the user's wallet funds, store unwanted content.                   | Use cold wallet.                                           |
-| Spoofing               | [Same-Chain attack replays](#same-chain-attack-replays)           | Reuses a signed transaction on the same chain to spoof user actions.                          | Drained wallet funds.                                                       | Include a unique nonce in request data.                    |
-| Spoofing               | [Cross-Chain attack replays](#cross-chain-attack-replays)         | Replays a signed transaction on another chain.                                                | Drained wallet funds.                                                       | Implement EIP-712.                                         |
-| Spoofing               | [Client spoofing via API](#client-spoofing-via-api)               | Access to the exposed node to use the API.                                                    | Node full API access.                                                       | Educate users.                                             |
-| Tampering              | [Fake proofs](#fake-proofs)                                       | The storage provider sends fake proofs.                                                       | Contracts reward without actual data storage, reducing network reliability. | Require random challenges periodically.                    |
-| Tampering              | [markProofAsMissing re-entrency](#markproofasmissing-re-entrency) | The validator uses re-entrancy to slash multiple times.                                       | Excessive collateral slashing of the host, proof validation failure.        | Apply the `Checks-Effects-Interactions` pattern.           |
-| Repudiation            | [Denial of file upload](#denial-of-file-upload)                   | User denies uploading illegal content.                                                        | Reputation impact and trust failure                                         | Make a clear legal statement.                              |
-| Repudiation            | [Clever host](#clever-host)                                       | Storage provider abandon its duties for a better opportunity.                                 | Reduces network reliability.                                                | Slash collateral and reward repairing slot.                |
-| Information disclosure | [Uploaded files exposed](#uploaded-files-exposed)                 | Non encrypted files can be reconstructed.                                                     | Reputation and privacy exposure.                                            | Add encryption layer.                                      |
-| Elevation of privilege | [Exploring a vulnerability](#exploring-a-vulnerability)           | The attacker exploits a vulnerability to take over the smart contracts.                       | System Disruption.                                                          | Upgradable contracts and / or admin role.                  |
-| Denial of service      | [Lazy host](#lazy-host)                                           | Host reserves a slot, but doesn't fill it                                                     | System Disruption.                                                          | Multiple reservations.                                     |
-| Denial of service      | [Lazy host](#lazy-host)                                           | Host reserves a slot, but doesn't fill it                                                     | System Disruption.                                                          | Multiple reservations.                                     |
-| Overload attack        | [Overload attack](#overload-attack)                               | Massive small requests to overload validators.                                                | System Disruption.                                                          | Client doesn't release content on the network.             |
-| Denial of service      | [Lazy Client](#lazy-client)                                       | Starting request fees.                                                                        | System Disruption.                                                          | Transaction cost                                           |
-| Denial of service      | [Censoring](#censoring)                                           | Acts like a lazy host for specific CIDs that it tries to censor fees.                         | System Disruption.                                                          | Dataset and CID and be rebuilt by other storage providers. |
-| Denial of service      | [Greedy](#greedy)                                                 | Storage provider tries to fill multiple slots in a request                                    | System Disruption.                                                          | Expanding window mechanism                                 |
-| Denial of service      | [Sticky](#sticky)                                                 | Storage provider tries to fill the same slot in a contract renewal.                           | System Disruption.                                                          | Expanding window mechanism                                 |
+| Category               | Threat                                                  | Impact                            | Danger |
+| ---------------------- | ------------------------------------------------------- | --------------------------------- | ------ |
+| Spoofing               | [Phishing](#phishing)                                   | Financial, integrity              | ⚠️     |
+| Spoofing               | [Same-Chain replay](#same-chain-replay)                 | Financial                         | 🛡️     |
+| Spoofing               | [Cross-Chain replay](#cross-chain-replay)               | Financial                         | ⚠️     |
+| Spoofing               | [API exposed](#api-exposed)                             | Abuse                             | ⚠️     |
+| Tampering              | [Fake proofs](#fake-proofs)                             | Financial, disruptability         | 🛡️     |
+| Tampering              | [Reentrancy](#Reentrancy)                               | Financial, integrity              | ⚠️     |
+| Repudiation            | [Clever host](#clever-host)                             | Disruptability                    | 🛡️     |
+| Information disclosure | [Data exposed](#data-exposed)                           | Reputation, privacy               | ⚠️     |
+| Denial of service      | [Lazy host](#lazy-host)                                 | Disruptability                    | 🛡️     |
+| Overload attack        | [Overload attack](#overload-attack)                     | Disruptability                    | ⚠️     |
+| Denial of service      | [Lazy Client](#lazy-client)                             | Disruptability                    | 🛡️     |
+| Denial of service      | [Censoring](#censoring)                                 | Censorship, disruptability, trust | 🛡️     |
+| Denial of service      | [Greedy](#greedy)                                       | Unfairness, disruptability        | 🛡️     |
+| Denial of service      | [Sticky](#sticky)                                       | Unfairness, centralization        | 🛡️     |
+| Elevation of privilege | [Exploring a vulnerability](#exploring-a-vulnerability) | Financial, disruptability         | 🔥     |
 
 ## Spoofing
 
 Threat action aimed at impersonating users or storage providers to access or manipulate
 files and contracts in the network.
 
-### Phishing-Induced spoofing
+### Phishing
 
 #### Scenario
 
 When starting a Codex node, the user must load his private key to pay for initiating new
-storage requests. This private key is loaded into memory, and there is no authentication
-process to use the API. An attacker could reach the user via email phishing,
+storage requests. This private key is stored in memory, and there is no authentication
+process required to use the API. An attacker could reach the user via email phishing,
 pretending to be from Codex. The email might redirect to a malicious website or include a
 form that, upon the user's click, triggers a request to the Codex node to create a new storage request.
 
@@ -117,17 +125,17 @@ Edit/view: https://cascii.app/437bc
 
 This could lead to two issues:
 
-- **Financial Loss**: Malicious requests drain user wallet funds
-- **Unwanted Content**: Attackers force storage of insecure or illegal files via
-  malicious CIDs, risking legal or reputational harm.
+- **Financial**: Malicious requests drain user wallet funds.
+- **Integrity**: Attackers force the storage of insecure or illegal files via malicious CIDs,
+  risking legal or reputational harm.
 
 #### Mitigation
 
 Typically, such web phishing attacks are mitigated by authentication or a
-[custom header](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#employing-custom-request-headers-for-ajaxapi) to verify the request’s legitimacy.
+custom header to verify the request’s legitimacy.
 
 However, Codex does not have an authentication mechanism, making options like CSRF
-tokens impractical and using a custom header would provide a poor user experience
+tokens impractical. Using a custom header would also provide a poor user experience
 in Codex, as users would need to set the header manually, which is cumbersome and error-prone.
 
 Users can reduce the risk of significant fund drainage by employing a hot wallet with
@@ -140,12 +148,29 @@ While this strategy mitigates the financial impact of unwanted storage requests,
 not address the storage of unwanted or illegal content. An attacker could still trick the
 user into storing harmful files via phishing.
 
-### Same-Chain attack replays
+#### DREAD score
+
+| Component            | Score | Description                                                      |
+| -------------------- | :---: | ---------------------------------------------------------------- |
+| **Damage Potential** |   9   | Leads to fund loss and illegal content storage.                  |
+| **Reproducibility**  |   8   | Easy to repeat once phishing is set up.                          |
+| **Exploitability**   |   9   | Only requires a phishing form.                                   |
+| **Affected Users**   |   7   | Targets many users running a node and unaware of security risks. |
+| **Discoverability**  |   3   | Finding individual Codex users to contact is non-trivial.        |
+
+**Average DREAD Score:** **7.2**
+
+#### References
+
+[CSRF](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#employing-custom-request-headers-for-ajaxapi)  
+[Web 3 phishing attacks](https://drops.scamsniffer.io/scam-sniffer-2024-web3-phishing-attacks-wallet-drainers-drain-494-million/)
+
+### Same-Chain replay
 
 #### Scenario
 
-An attacker reuses a user’s signed transaction on the same chain to spoof additional
-requests, attempting to drain funds.
+An attacker captures a previously signed transaction and resends it on the same blockchain.
+Because the signature is still valid, the transaction is accepted, and the attacker can drain the user's funds.
 
 ```
         ──────
@@ -200,21 +225,36 @@ Edit/view: https://cascii.app/b28b7
 
 #### Impacts
 
-- **Financial Loss**: Duplicate requests drain user funds
+- **Financial**: Duplicate requests can drain user funds.
 
 #### Mitigation
 
-Include a unique, random `nonce` in the request data. This ensures signatures are unique
-per request, preventing reuse on the same chain. Codex’s current implementation includes
-this, fully mitigating the threat.
+Include a unique, random `nonce` in the request data. This makes each signature unique and
+prevents it from being reused on the same chain.
 
-### Cross-Chain attack replays
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                          |
+| -------------------- | :---: | ---------------------------------------------------- |
+| **Damage Potential** |   8   | Can drain user funds through repeated transactions.  |
+| **Reproducibility**  |   9   | Easy to repeat once a valid transaction is captured. |
+| **Exploitability**   |   8   | Requires access to a signed transaction.             |
+| **Affected Users**   |   9   | Affects any user sending signed requests.            |
+| **Discoverability**  |   7   | Easy to try for the attacker.                        |
+
+**Average DREAD Score:** **8.2**
+
+#### References
+
+[Quicknode](https://www.quicknode.com/guides/ethereum-development/smart-contracts/what-are-replay-attacks-on-ethereum#nonce)
+
+### Cross-Chain replay
 
 #### Scenario
 
-An attacker captures a user’s signed transaction from one chain and replays it on another
-with an identical `Marketplace.sol` contract. The signature, publicly visible in blockchain,
-validates without needing the user’s private key, spoofing their intent.
+An attacker captures a user’s signed transaction from a blockchain and replays it on
+another chain that runs the same `Marketplace.sol` contract. Because the signature is
+public and still valid, it can be used to replay the request and drain the user's funds.
 
 ```
         ──────
@@ -262,33 +302,52 @@ validates without needing the user’s private key, spoofing their intent.
            ╷                                 ╷
            ╷                                 ╷
            ╷                                 ╷
-           ▼                              ──────
-┌──────────────────────┐                ─│      ─│
-│                      │               │           │
-│     Chain 1001       │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶│  Attacker │
-│                      │               │           │
-└──────────────────────┘                ─│      ─│
-                                          ──────
+           ▼                               ──────
+┌──────────────────────┐                 ─│      ─│
+│                      │                │           │
+│     Chain 1001       │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶ │ Attacker  │
+│                      │                │           │
+└──────────────────────┘                 ─│      ─│
+                                           ──────
+
+
 ```
 
-Edit/view: https://cascii.app/9951e
+Edit/view: https://cascii.app/673f2
 
 #### Impacts
 
-- **Financial Loss**: Replayed requests on another chain drain user funds
+- **Financial**: Replayed requests on another chain can drain user funds.
 
 #### Mitigation
 
-Implement EIP-712 to include chain-specific data in signed transaction, ensuring
-signatures are valid only on the intended chain and preventing unauthorized replays
-on other chains.
+Implement EIP-712 to include chain-specific data in the signed transaction.
+This ensures the signature is only valid on the intended chain and prevents unauthorized
+replays on other chains.
 
-### Client spoofing via API
+#### DREAD Score: Cross-Chain Attack Replays
+
+| DREAD Component      | Score | Description                                        |
+| -------------------- | :---: | -------------------------------------------------- |
+| **Damage Potential** |   8   | Can drain user funds across multiple chains.       |
+| **Reproducibility**  |   5   | Needs two contract deployments on two blockchains. |
+| **Exploitability**   |   7   | Needs access to a signed transaction.              |
+| **Affected Users**   |   9   | Affects any user.                                  |
+| **Discoverability**  |   7   | Easy to try for the attacker.                      |
+
+**Average DREAD Score:** **7.2**
+
+#### References
+
+[Quicknode](https://www.quicknode.com/guides/ethereum-development/smart-contracts/what-are-replay-attacks-on-ethereum#chain-id)
+
+### API exposed
 
 #### Scenario
 
-A user starts a node locally and uses `api-bindaddr` with the value `0.0.0.0`.
-Worse, he confuses port forwarding and enable it for the REST API as well.
+A user starts a node locally and sets `api-bindaddr` to `0.0.0.0`.
+Worse, the user mistakenly enables port forwarding for the REST API as well.
+As a result, the API is exposed, and an attacker can send any requests he wants.
 
 ```
                                      ──────
@@ -331,14 +390,25 @@ Edit/view: https://cascii.app/b762d
 
 #### Impacts
 
-- **Node full API control**: Attackers can send unauthorized API requests, draining funds
-  or storing illegal content.
+- **Abuse**: Attackers can send API requests, draining funds or storing illegal content.
 
 #### Mitigation
 
-Educate the user to not use `0.0.0.0` for `api-bindaddr` unless he really knows what he
-is doing and not enabling the port forwarding for the REST API. A warning during the
-startup could be displayed if `api-bindaddr` is not bound to localhost.
+Educate users not to use `0.0.0.0` for `api-bindaddr` unless they fully understand the risks,
+and to avoid enabling port forwarding for the API. A warning could be shown at startup
+if `api-bindaddr` is not bound to `localhost`.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                    |
+| -------------------- | :---: | ---------------------------------------------- |
+| **Damage Potential** |  10   | Full API access.                               |
+| **Reproducibility**  |   5   | Easy if node is misconfigured and exposed.     |
+| **Exploitability**   |  10   | Needs no exploit.                              |
+| **Affected Users**   |   2   | Affects users exposing their API by mistake.   |
+| **Discoverability**  |   6   | Attackers can scan networks for exposed ports. |
+
+**Average DREAD Score:** **6.6**
 
 ## Tampering
 
@@ -349,9 +419,9 @@ the network.
 
 #### Scenario
 
-In the case of the proof verification is weak and proofs can be submitted and verified easily,
-a storage provider could stop storing the data and attempts to send fake proofs, claiming they
-are still hosting the content, using initial data received.
+If proof verification is weak and proofs can be submitted and verified too easily,
+a storage provider could stop storing the data and attempt to send fake proofs,
+claiming they are still hosting the content using the initial data they received.
 
 ```
          ──────
@@ -370,14 +440,14 @@ are still hosting the content, using initial data received.
 │                        │
 │      Codex network     │◀╶╶╶╶╶╶╶╶╶╶╶╶╶┐
 │                        │              ╷
-└────────────────────────┘              ╷
+└────────────────────────┘
+            ╷                   Delete the file
+            ╷                   Submit fake proof
             ╷                           ╷
             ╷                           ╷
-            ╷         Delete the file   ╷
-            ╷         Submit fake proof ╷
             ╷                           ╷
             ╷                           ╷
-            ╷                           ╷
+            ╷                           ▼
             ╷                        ──────
             ╷                      ─│      ─│
             ╷                     │           │
@@ -398,156 +468,111 @@ are still hosting the content, using initial data received.
  └────────────────────┘
 ```
 
-Edit/view: https://cascii.app/9de0e
+Edit/view: https://cascii.app/cc7e0
 
 #### Impacts
 
-- **Financial**: Attackers attempt to earn contract rewards at the end of the contract
-  without storing the file.
-- **Availability**: The slot becomes unavailable from that storage provider, reducing
-  network reliability.
+- **Financial**: Attackers try to earn contract rewards at the end of the contract without
+  actually storing the file.
+- **Disruptability**: The slot becomes unavailable from that storage provider,
+  reducing network reliability.
 
 #### Mitigation
 
-Codex issues periodic random challenges based on blockchain randomness to verify that
-storage providers hold the data. Each failed challenge slashes the provider’s collateral.
-After multiple failed proofs, the provider is removed from the contract, freeing the
-slot for another provider.
+Codex issues periodic random challenges, based on blockchain randomness, to verify that storage
+providers still hold the data. Each failed challenge slashes the provider’s collateral. After multiple
+failed proofs, the provider is removed from the contract, freeing the slot for another provider.
 
-### markProofAsMissing re-entrency
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                        |
+| -------------------- | :---: | -------------------------------------------------- |
+| **Damage Potential** |   8   | Earns rewards without storing data.                |
+| **Reproducibility**  |   6   | Easy if challenge system is weak or predictable.   |
+| **Exploitability**   |   3   | Needs technical knowledge and protocol weaknesses. |
+| **Affected Users**   |   5   | Impacts users who stored data on "attacker" hosts. |
+| **Discoverability**  |   3   | Needs deep source code analysis to detect.         |
+
+**Average DREAD Score:** **5.0**
+
+#### References
+
+[One File for the Price of Three: Catching Cheating Servers in Decentralized Storage Networks](https://web.archive.org/web/20240518000652/https://hackingdistributed.com/2018/08/06/PIEs/)
+
+### Reentrancy
 
 #### Scenario
 
-A validator could exploit a reentrancy vulnerability in `markProofAsMissing` by re-entering
-the function during an external token transfer, allowing multiple slashes and rewards
-for a single missed proof within one transaction.
+The `markProofAsMissing` function, along with related functions such as `fillSlot` and `requestStorage`,
+makes external calls (e.g., `transferFrom`) before completing internal state updates.
+This opens the door to reentrancy attacks, where an attacker can re-enter the function and trigger
+multiple operations in a single transaction, such as slashing collateral multiple times
+or claiming validator rewards repeatedly.
 
 ```js
 // Generated from slither report
-Reentrancy in Marketplace.markProofAsMissing(SlotId,Periods.Period) (contracts/Marketplace.sol#338-360):
+Reentrancy in Marketplace.fillSlot(RequestId,uint64,Groth16Proof) (contracts/Marketplace.sol#187-251):
         External calls:
-        - assert(bool)(_token.transfer(msg.sender,validatorRewardAmount)) (contracts/Marketplace.sol#352)
+        - _transferFrom(msg.sender,collateralAmount) (contracts/Marketplace.sol#234)
+                - ! _token.transferFrom(sender,receiver,amount) (contracts/Marketplace.sol#688)
         Event emitted after the call(s):
-        - RequestFailed(requestId) (contracts/Marketplace.sol#396)
-                - _forciblyFreeSlot(slotId) (contracts/Marketplace.sol#358)
-        - SlotFreed(requestId,slot.slotIndex) (contracts/Marketplace.sol#385)
-                - _forciblyFreeSlot(slotId) (contracts/Marketplace.sol#358)
+        - RequestFulfilled(requestId) (contracts/Marketplace.sol#249)
+        - SlotFilled(requestId,slotIndex) (contracts/Marketplace.sol#241)
+Reentrancy in Marketplace.markProofAsMissing(SlotId,Periods.Period) (contracts/Marketplace.sol#345-371):
+        External calls:
+        - ! _token.transfer(msg.sender,validatorRewardAmount) (contracts/Marketplace.sol#361)
+        Event emitted after the call(s):
+        - RequestFailed(requestId) (contracts/Marketplace.sol#407)
+                - _forciblyFreeSlot(slotId) (contracts/Marketplace.sol#369)
+        - SlotFreed(requestId,slot.slotIndex) (contracts/Marketplace.sol#396)
+                - _forciblyFreeSlot(slotId) (contracts/Marketplace.sol#369)
+Reentrancy in Marketplace.requestStorage(Request) (contracts/Marketplace.sol#132-177):
+        External calls:
+        - _transferFrom(msg.sender,amount) (contracts/Marketplace.sol#174)
+                - ! _token.transferFrom(sender,receiver,amount) (contracts/Marketplace.sol#688)
+        Event emitted after the call(s):
+        - StorageRequested(id,request.ask,_requestContexts[id].expiresAt) (contracts/Marketplace.sol#176)
 ```
-
-```
-                              ──────
-                            ─│      ─│
-                           │           │
-                           │   User    │
-                           │           │
-                            ─│      ─│
-                              ──────
-                                 ╷
-                        Storage  ╷
-                        Request  ╷
-                                 ▼
-                   ┌───────────────────────────┐
-Re-entrency        │                           │
-                   │                           │
-       ┌╶╶╶╶╶╶╶╶╶╶▶│      Codex network        │
-       ╷           │                           │
-       ╷           │                           │
-       ╷           ▲───────────────────────────┘
-       ╷           ╷             ╷
-       ╷           ╷             ╷
-    ──────         ╷             ╷                     ──────
-  ─│      ─│       ╷             ╷                   ─│      ─│
- │           │     ╷             ╷                  │           │
- │ Validator │╶╶╶╶╶┘             ╷                  │    SP     │
- │           │                   ╷                  │           │
-  ─│      ─│                     ╷                   ─│      ─│
-    ──────                       ╷                     ──────
-       ▲                         ╷                        ▲
-       ╷                         ▼                        ╷
-       ╷              ┌────────────────────┐              ╷
-       └╶╶╶╶╶╶╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 3│╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
-                      └────────────────────┘
-```
-
-Edit/view: https://cascii.app/0e182
-
-#### Impacts
-
-- **Financial**: Attackers could earn multiple validation rewards and excessively
-  slash the host’s collateral for a single missed proof, draining funds unfairly.
-- **Validation**: Repeated slashing disrupts PoR verification, potentially marking
-  valid proofs as missing and undermining trust.
 
 #### Mitigation
 
-Apply the `Checks-Effects-Interactions` pattern by updating state before the external
-`_token.transfer` call.
-Use OpenZeppelin’s `ReentrancyGuard` to block reentrant calls.
+Apply the `Checks-Effects-Interactions` pattern.  
+Use OpenZeppelin’s `ReentrancyGuard` to prevent nested entry into sensitive functions.
 
-[1]: https://owasp.org/www-community/Threat_Modeling_Process#stride
-[2]: https://cdn2.hubspot.net/hubfs/4598121/Content%20PDFs/VerSprite-PASTA-Threat-Modeling-Process-for-Attack-Simulation-Threat-Analysis.pdf
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                           |
+| -------------------- | :---: | ----------------------------------------------------- |
+| **Damage Potential** |   8   | Can drain funds via multiple slashes and rewards.     |
+| **Reproducibility**  |   2   | Works consistently if reentrancy is not prevented.    |
+| **Exploitability**   |   2   | Requires contract-level knowledge and timing control. |
+| **Affected Users**   |   6   | Affects all contracts using `markProofAsMissing`.     |
+| **Discoverability**  |   6   | Can be found through careful contract audit.          |
+
+**Average DREAD Score:** **4.8**
+
+#### References
+
+[Solidity](https://docs.soliditylang.org/en/latest/security-considerations.html#reentrancy)
+[Checks-Effects-Interactions](https://docs.soliditylang.org/en/latest/security-considerations.html#use-the-checks-effects-interactions-pattern)
+[Reentrancy guard](https://docs.openzeppelin.com/contracts/4.x/api/security#ReentrancyGuard)
 
 ## Repudiation
 
 Threat action aimed at denying responsibility for uploading files or agreeing to storage
 contracts in the network.
 
-### Denial of file upload
-
-#### Scenario
-
-A user uploads illegal content to Codex and later denies initiating the request,
-attempting to escape responsibility.
-
-```
-                  ──────
-                ─│      ─│
-               │           │
-               │ Anonymous │
-               │           │
-                ─│      ─│
-                  ──────
-                     ╷
-          Illegal    ╷
-          Content    ╷
-                     ▼
-           ┌───────────────────┐
-           │                   │
-           │   Codex protocol  │
-           │                   │
-           └───────────────────┘
-                     ▲
-                     ╷
-                     ╷
-                     ╷
-   ──────            ╷           ──────
- ─│      ─│          ╷         ─│      ─│
-│           │        ╷        │           │
-│   User    │╶╶╶╶╶╶╶╶└╶╶╶╶╶╶╶╶│   User    │
-│           │                 │           │
- ─│      ─│      Download      ─│      ─│
-   ──────                        ──────
-```
-
-Edit/view: https://cascii.app/5b9a9
-
-#### Impacts
-
-- **Reputation**: Codex could be used to distribute illegal content, leading to a
-  loss of trust in the protocol.
-
-#### Mitigation
-
-Make a clear statement that Codex is not responsible for such content and warn users of the
-potential risk for downloading an unknown CID.
-
 ### Clever host
 
 #### Scenario
 
-In this attack, an SP could fill a slot, and while fulfilling its duties, see
-that a better opportunity has arisen, and abandon its duties in the first slot
-to fill the second slot.
+A storage provider can fill a slot and begin fulfilling its duties.
+However, if a more profitable opportunity appears, the provider may abandon the first slot
+in favor of the new one.
+
+This behavior is not intended to harm the network but to pursue a better opportunity.
+It is considered a form of repudiation, as the provider is effectively denying
+its original commitment in order to prioritize another.
 
 ```
                         ──────
@@ -583,107 +608,143 @@ Fill Request 1 Slot 2      ╷                                   ╷
                     ─│──      ───│   to fill Request 2 Slot 2  ╷
                      │           │                             ▼
                    │               │                ┌────────────────────┐
-                   │  Clever host  │────────────────│Slot 1│Slot 2│Slot 3│
+                   │  Clever host  │╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶ │Slot 1│Slot 2│Slot 3│
                    │               │                └────────────────────┘
                      │           │
                     ─│──      ───│
                         ──────
 ```
 
-Edit/view: https://cascii.app/db2da
+Edit/view: https://cascii.app/93704
 
 #### Impacts
 
-- **Availability**: The slot becomes unavailable from that storage provider,
+- **Disruptability**: The slot becomes unavailable from that storage provider,
   reducing network reliability.
 
 #### Mitigation
 
 This attack is mitigated by the storage provider losing its request collateral for the first
-slot once it is abandoned. Additionally, once the storage provider fills the first slot, it
-will accrue rewards over time that will not be paid out until the request
-successfully completes. These rewards act as another disincentive for the storage
-provider to abandon the slot.
+slot once it is abandoned. Additionally, after filling the first slot, the provider begins
+to accrue rewards over time, but these rewards are only paid out if the request is
+successfully completed. This delayed payout acts as an additional disincentive for the
+storage provider to abandon the slot.
+``
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                        |
+| -------------------- | :---: | -------------------------------------------------- |
+| **Damage Potential** |   5   | Reduces network reliability and causes slot waste. |
+| **Reproducibility**  |   5   | Easy to repeat if better-paying slots are common.  |
+| **Exploitability**   |   4   | Requires strategy but no technical exploit.        |
+| **Affected Users**   |   4   | Affects clients relying on abandoned slots.        |
+| **Discoverability**  |   3   | Hard to detect unless monitored closely.           |
+
+**Average DREAD Score:** **4.2**
 
 ## Information disclosure
 
 Information disclosure occurs when private or sensitive information such as user data,
 file contents, or system secrets is unintentionally or maliciously revealed to unauthorized parties.
 
-### Uploaded files exposed
+### Data exposed
 
 #### Scenario
 
-A user uploads a confidential file to Codex. Storage providers store non encrypted slots
-of the file. Without encryption, storage providers could agree to gather slots and
+A user uploads a confidential file to Codex. Storage providers store unencrypted slots
+of the file. Without encryption, providers could coordinate to gather these slots and
 reassemble the full content.
+Additionally, sensitive metadata, such as file location or identifiers, may be exposed.
+Other users could access this information, creating a privacy risk.
 
 ```
-                        ──────
-                      ─│      ─│
-                     │           │
-                     │   User    │
-                     │           │
-                      ─│      ─│                       ──────
-                        ──────                       ─│      ─│
-                           ╷                        │Better     │
-                           ╷                        │Opportunity│
-                           ╷                        │           │
-                           ╷                         ─│      ─│
-                           ▼                           ──────
-                 ┌────────────────────┐                   ╷
-                 │                    │                   ╷
-                 │   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
-                 │                    │
-                 └────────────────────╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
-                           ╷                                   ╷
-                Request 1  ╷                                   ╷
-                           ╷                                   ╷
-                           ╷                                   ╷
-                           ▼                                   ╷
-                ┌────────────────────┐                         ╷
-                │Slot 1│Slot 2│Slot 3│                         ╷
-                └────────────────────┘                         ╷
-                           ╷                                   ╷
-                           ╷                                   ╷
-Fill Request 1 Slot 2      ╷                                   ╷
-                           ▼                                   ╷
-                        ──────       Abandon Request 1 Slot 2  ╷
-                    ─│──      ───│   to fill Request 2 Slot 2  ╷
-                     │           │                             ▼
-                   │               │                ┌────────────────────┐
-                   │  Clever host  │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 3│
-                   │               │                └────────────────────┘
-                     │           │
-                    ─│──      ───│
-                        ──────
+                       ──────
+                     ─│      ─│
+                    │           │
+                    │   User    │
+                    │           │
+                     ─│      ─│
+                       ──────
+                          ╷
+          Upload a file   ╷
+                          ╷
+                          ▼           Access to the    ──────
+                 ┌─────────────────┐  file metadata  ─│      ─│
+                 │                 │                │           │
+                 │      Codex      │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶│   User    │
+                 │                 │                │           │
+                 └─────────────────┘                 ─│      ─│
+                          │                            ──────
+                          │
+                          │
+                          ▼
+               ┌────────────────────┐
+      ┌╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 1│╶╶╶╶╶╶╶╶╶┐
+      ╷        └────────────────────┘         ╷
+      ╷                   ╷                   ╷
+      ╷                   ╷                   ╷
+      ▼                   ▼                   ▼
+   ──────              ──────              ──────
+ ─│      ─│          ─│      ─│          ─│      ─│
+│           │       │           │       │           │
+│    SP     │       │    SP     │       │    SP     │
+│           │       │           │       │           │
+ ─│      ─│          ─│      ─│          ─│      ─│
+   ──────              ──────              ──────
+      ╷                   ╷                   ╷
+      ╷                   ╷                   ╷
+      ╷                   ▼                   ╷
+      ╷        ┌──────────────────────┐       ╷
+      ╷        │                      │       ╷
+      └╶╶╶╶╶╶▶ │     Original file    │◀╶╶╶╶╶╶┘
+               │                      │
+               └──────────────────────┘
 ```
 
-Edit/view: https://cascii.app/ef5ab
+Edit/view: https://cascii.app/07f58
 
 #### Impacts
 
 - **Reputation**: Codex cannot guarantee confidentiality, leading to a loss of
   trust in the protocol.
-- **Privacy**: Exposure of sensitive user data could violate privacy, potentially
-  resulting in legal or regulatory consequences.
+- **Privacy**: Exposure of sensitive user data could violate privacy and potentially
+  result in legal or regulatory consequences.
 
 #### Mitigation
 
-Implement encryption to ensure that only authorized users can decrypt and access the file contents.
+Encrypt files on the client side before upload to ensure that only authorized users
+can decrypt and access the contents. In addition, sensitive metadata should be removed or
+encrypted where possible to reduce the risk of privacy leaks.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                                     |
+| -------------------- | :---: | --------------------------------------------------------------- |
+| **Damage Potential** |   7   | Sensitive data or metadata may be publicly exposed.             |
+| **Reproducibility**  |   4   | Easy if metadata are exposed, harder for full file content.     |
+| **Exploitability**   |   2   | Requires file access and slot coordination.                     |
+| **Affected Users**   |   7   | Affects users storing unencrypted or sensitive content.         |
+| **Discoverability**  |   8   | Exposed content and metadata can be browsed in the source code. |
+
+**Average DREAD Score:** **5.6**
+
+[References]
+
+[Metadata = Surveillance](https://www.schneier.com/blog/archives/2014/03/metadata_survei.html?utm_source=chatgpt.com)
 
 ## Denial of service
+
+Threat action intended to make a service or resource unavailable to its intended users by overloading,
+blocking, or disrupting normal operations.
 
 ### Lazy host
 
 #### Scenario
 
-In the case of a single reservation system, matching storage providers are assigned to
-slot reservation by a 1-1 relation, meaning that there is one storage provider
-for one reservation.
-A storage provider reserves a slot, but waits to fill the slot hoping a better
-opportunity will arise, in which the reward earned in the new opportunity would be
-greater than the reward earned in the original slot.
+In a single-reservation system, each slot is assigned to one storage provider through a 1-to-1 match.
+A storage provider may reserve a slot but delay filling it, hoping a better opportunity will appear —
+one that offers a higher reward than the original slot.
 
 ```
       ──────                                                ──────
@@ -728,23 +789,34 @@ Edit/view: https://cascii.app/6144e
 
 #### Impacts
 
-- **Availability**: The storage request will fail because the storage provider assigned to the slot
-  decided not to fill it for a better opportunity, leaving the slot empty.
+- **Disruptability**: The storage request fails because the assigned storage provider
+  chooses not to fill the slot, leaving it empty in favor of a better opportunity.
 
 #### Mitigation
 
-This attack is mitigated by allowing for multiple reservations per slot.
-All storage providers that have secured a reservation (capped at three) will race to fill the slot.
-Thus, if one or more storage providers that have reserved the slot decide to
-pursue other opportunities, the other storage providers that have reserved the slot will
-still be able to fill the slot.
+This attack is mitigated by allowing multiple reservations per slot.
+Up to three storage providers can reserve the same slot and race to fill it.
+If one or more providers choose to pursue other opportunities, the others can still
+complete the request, ensuring reliability.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                                    |
+| -------------------- | :---: | -------------------------------------------------------------- |
+| **Damage Potential** |   7   | Fails storage requests, but no direct economic loss.           |
+| **Reproducibility**  |   5   | Easy to repeat if system allows only single reservations.      |
+| **Exploitability**   |   3   | Requires strategic delay by the storage provider.              |
+| **Affected Users**   |   4   | Affects users assigned to non-participating storage providers. |
+| **Discoverability**  |   4   | Hard to detect until the storage deadline is missed.           |
+
+**Average DREAD Score:** **4.6**
 
 ### Overload attack
 
 #### Scenario
 
-An attacker runs many small requests that generate high-volume transactions, overwhelming
-validators and delaying their ability to detect missed proofs.
+An attacker sends many small storage requests that generate a high volume of transactions.
+This overloads validators and delays their ability to detect missed proofs in time.
 
 ```
                         ──────
@@ -793,109 +865,307 @@ Edit/view: https://cascii.app/b6a31
 
 #### Impacts
 
-- **System Disruption**: Hosts might temporarily avoid penalties for not serving content,
+- **Disruptability**: Hosts might temporarily avoid penalties for not serving content,
   reducing file availability and causing users to lose trust in the Codex protocol.
 
 #### Mitigation
 
-Codex requires a small fee for each request, which helps mitigate this threat.
-Other mitigations are also possible: optimizing the validation process to make proof
-checks faster, limiting the number of storage requests per IP, and setting a minimum
-file upload size.
+Codex requires a small fee for each request, which helps limit spam.
+Additional mitigations include optimizing the validation process to make proof checks faster,
+limiting the number of storage requests per IP address, and setting a minimum file upload size.
+
+#### DREAD Score
+
+#### DREAD Score: Overload Attack
+
+| DREAD Component      | Score | Description                                                    |
+| -------------------- | :---: | -------------------------------------------------------------- |
+| **Damage Potential** |   8   | Temporarily weakens validation and file availability.          |
+| **Reproducibility**  |   2   | Hard to repeat.                                                |
+| **Exploitability**   |   2   | Requires ability to send many valid requests at scale.         |
+| **Affected Users**   |  10   | Affects all users.                                             |
+| **Discoverability**  |   4   | Noticeable during high load but hard to trace to one attacker. |
+
+**Average DREAD Score:** **5.2**
 
 ### Lazy Client
 
 #### Scenario
 
-A client may try to disrupt the network by making storage requests but never providing the
-actual data to storage providers who are trying to fill the storage slots.
+A client may try to disrupt the network by making storage requests but never provides
+the actual data to the storage providers attempting to fill those slots.
+As a result, the slots remain unfilled, wasting provider resources and delaying other requests.
+
+```
+                       ──────
+                     ─│      ─│
+                    │           │
+                    │   User    │
+                    │           │
+                     ─│      ─│
+                       ──────
+                          ╷
+          Upload a file   ╷
+                          ╷
+                          ▼
+                 ┌─────────────────┐
+                 │                 │
+                 │      Codex      │
+                 │                 │
+                 └─────────────────┘
+                          ╷
+      Reservations        ╷
+      without releasing   ╷
+      data                ▼
+               ┌────────────────────┐
+      ┌╶╶╶╶╶╶╶╶│Slot 1│Slot 2│Slot 1│╶╶╶╶╶╶╶╶╶┐
+      ╷        └────────────────────┘         ╷
+      ╷                   ╷                   ╷
+      ╷                   ╷                   ╷
+      ▼                   ▼                   ▼
+   ──────              ──────              ──────
+ ─│      ─│          ─│      ─│          ─│      ─│
+│           │       │           │       │           │
+│    SP     │       │    SP     │       │    SP     │
+│           │       │           │       │           │
+ ─│      ─│          ─│      ─│          ─│      ─│
+   ──────              ──────              ──────
+```
+
+Edit/view: https://cascii.app/c973a
 
 #### Impacts
 
-- **Wasting Resources**: Storage providers waste their resources trying to store data that
-  never gets provided, making the network less efficient.
+- **Disruptability**: Storage providers waste resources trying to store data that
+  is never delivered, reducing the overall efficiency of the network.
 
 #### Mitigation
 
-The transaction cost for each request helps prevent this attack. The more requests the attacker
-makes, the higher the cost will be because of rising gas fees and block fill rates.
-This makes it expensive for attackers to keep sending fake requests and spamming the network.
+The transaction cost for each storage request helps prevent this attack.
+The more fake requests an attacker sends, the higher the total cost becomes due to
+rising gas fees and block fill rates.
+This makes it economically unfeasible to sustain large-scale spamming.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                                     |
+| -------------------- | :---: | --------------------------------------------------------------- |
+| **Damage Potential** |   5   | Wastes storage provider resources and slows the system.         |
+| **Reproducibility**  |   2   | Possible but limited by transaction costs and network capacity. |
+| **Exploitability**   |   2   | Requires funding.                                               |
+| **Affected Users**   |   8   | Affects most users during periods of slot disruption.           |
+| **Discoverability**  |   3   | Hard to discover.                                               |
+
+**Average DREAD Score:** **4.0**
 
 ### Censoring
 
 #### Scenario
 
-A Storage provider tries to block access to specific CIDsfrom the network in order to censor
-certain content. This could also happen during a repair process when a service provider tries
-to stop a freed slot from being repaired by not sharing the necessary data.
+A storage provider attempts to block access to specific CIDs in order to censor certain content.
+This can also occur during the repair process, where the provider refuses to share the required
+data, preventing a freed slot from being restored by others in the network.
+
+```
+                      ──────
+                    ─│      ─│
+                   │           │
+                   │   User    │
+                   │           │
+                    ─│      ─│
+                      ──────
+                         ╷
+         Upload a file   ╷
+                         ╷
+                         ▼
+                ┌─────────────────┐
+                │                 │
+                │      Codex      │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+                │                 │               ╷
+                ╷─────────────────╷               ╷
+                ╷                 ╷               ╷
+                ╷                 ╷ Block the     ╷
+Store the file  ╷                 ╷ content       ╷                  ──────
+                ╷                 ╷         ┌───────────┐          ─│      ─│
+                ╷     ──────      ╷         │           │         │           │
+                ╷   ─│      ─│    ╷         │    CID    │◀╶╶╶╶╶╶╶╶│   User    │
+                ╷  │           │  ╷         │           │         │           │
+                └╶▶│    SP     │◀╶┘         └───────────┘          ─│      ─│
+                   │           │                                     ──────
+                    ─│      ─│
+                      ──────
+```
+
+Edit/view: https://cascii.app/e1d00
 
 #### Impacts
 
-- **Censored Content**: The service prodivder may stop users from accessing certain data,
-  preventing them from retrieving content they need.
-- **Data Unavailability**: If the service provider tries to block data during a repair,
+- **Censorship**: The storage provider may prevent users from accessing certain data,
+  stopping them from retrieving content they need.
+- **Disruptability**: If the storage provider blocks data during a repair,
   it could stop the network from restoring missing files, making the data unavailable.
-- **Trust Issues**: Users may lose trust in the network if they believe that some service providers
+- **Trust**: Users may lose trust in the network if they believe some providers
   can block or censor content.
 
 #### Mitigation
 
-Even if one SP withholds certain content, the dataset and the blocked CID can be rebuilt using
-chunks from other service providers. This means that the censored CID can still be accessed
-through other nodes, making the attack less successful.
+Even if one storage provider withholds certain content, the dataset and the blocked CID
+can be rebuilt using chunks from other providers. This means the censored CID can still
+be accessed through other nodes, reducing the impact of the attack.
 
 ### Greedy
 
 #### Scenario
 
-A storage provider tries to fill multiple slots in a single request. This can be harmful because
-it allows a single SP to control more resources than intended.
+A storage provider attempts to fill multiple slots in the same storage request by quickly submitting
+multiple offers. This gives them a larger share of the deal, limiting participation by other providers.
+
+```
+             ──────
+           ─│      ─│
+          │           │
+          │   User    │
+          │           │
+           ─│      ─│
+             ──────
+                ╷
+Upload a file   ╷
+                ╷
+                ▼
+       ┌─────────────────┐
+       │                 │
+       │      Codex      │
+       │                 │
+       └─────────────────┘
+                ╷
+                ╷
+                ╷
+                ╷
+                ▼
+      ┌────────────────────┐
+      │Slot 1│Slot 2│Slot 3│
+      └────────────────────┘
+          ╷      ╷      ╷
+          ╷      ╷      ╷
+          └╶╶╶╶╶╶╷╶╶╶╶╶╶┘
+                 ╷
+                 ▼
+              ──────
+            ─│      ─│
+           │           │
+           │    SP     │
+           │           │
+            ─│      ─│
+              ──────
+```
+
+Edit/view: https://cascii.app/f3984
 
 #### Impacts
 
-- **Resource Control**: Reducing fairness and spreading resources not reparted.
-- **Network Inefficiency**: Limit the opportunity for other SPs to participate, affecting the
-  overall efficiency of the network.
+- **Unfairness**: Allows one provider to control more resources than intended, reducing fairness
+  in slot allocation.
+- **Disruptability**: Limits opportunities for other providers and reduces network decentralization.
 
 #### Mitigation
 
-The expanding window mechanism helps prevent this attack. It makes sure that no single SP can fill
-all the slots in a request by gradually opening up space for other service providers.
-This works most of the time, but it may not be fully effective once the request is about to expire.
+The expanding window mechanism helps prevent this attack. It gradually opens slot availability to more
+storage providers, making it harder for one to dominate all slots early. However, near the expiration of
+the request, the mechanism may be less effective, as fewer providers may be available to fill new slots in time.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                                   |
+| -------------------- | :---: | ------------------------------------------------------------- |
+| **Damage Potential** |   5   | Reduces fairness; may lead to centralization over time.       |
+| **Reproducibility**  |   6   | Easy to repeat with fast or automated submissions.            |
+| **Exploitability**   |   2   | Requires timing advantage or faster infrastructure.           |
+| **Affected Users**   |   6   | Affects any users sharing storage requests with greedy hosts. |
+| **Discoverability**  |   4   | Can go unnoticed unless provider patterns are analyzed.       |
+
+**Average DREAD Score:** **4.6**
 
 ### Sticky
 
 #### Scenario
 
-A storage provider tries to keep control of a storage slot during a contract renewal. The SP does
-this by withholding the data from other SPs and waiting until the expanding window allows them to
-fill the slot again. Since they already have the data, they can act faster than others and fill
-the slot before anyone else.
+A storage provider tries to retain control of a storage slot during contract renewal.
+They do this by withholding the data from other providers and waiting for the expanding
+window to open. Since they already have the data, they can act faster than others
+and fill the slot again before anyone else.
+
+```
+             ──────
+           ─│      ─│
+          │           │
+          │   User    │
+          │           │
+           ─│      ─│
+             ──────
+                ╷
+Upload a file   ╷
+                ╷
+                ▼
+       ┌─────────────────┐
+       │                 │
+       │      Codex      │
+       │                 │
+       └─────────────────┘
+                ╷
+                ╷             ┌───────────────────────┐
+                ╷             │                       │
+ Store the file ╷             │    Contract renewal   │
+                ╷             │                       │
+                ╷             └───────────────────────┘
+                ╷                         ▲
+                ▼                         ╷
+             ──────                       ╷
+           ─│      ─│                     ╷
+          │           │                   ╷
+          │    SP     │╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+          │           │        Witholding data
+           ─│      ─│          and wait for expanding
+             ──────            window to open
+```
+
+Edit/view: https://cascii.app/db8fa
 
 #### Impacts
 
-- **Unfair Advantage**: The service provider gains an unfair advantage by being able to renew the
-  contract without giving other SPs a fair chance.
-- **Network Centralization**: Llead to fewer service providers handling more data, making the network
-  less balanced.
+- **Unfairness**: The storage provider gains an unfair advantage by renewing the
+  contract without giving others a fair opportunity.
+- **Centralization**: Can lead to fewer storage providers handling more data,
+  making the network less balanced and more centralized.
 
 #### Mitigation
 
-The attack is difficult and unlikely to work unless the service provider controls a large part of the
-network. The expanding window mechanism also helps by spreading out control and giving other SPs a
-fair chance to fill the slots.
+This attack is difficult to succeed with unless the storage provider controls a large
+portion of the network. The expanding window mechanism helps prevent this by spreading
+out renewal opportunities and giving other providers a fair chance to fill the slots.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                              |
+| -------------------- | :---: | -------------------------------------------------------- |
+| **Damage Potential** |   5   | Unfair slot control but no direct loss.                  |
+| **Reproducibility**  |   2   | Requires repeated timing success in renewal windows.     |
+| **Exploitability**   |   2   | Hard with window mechanism.                              |
+| **Affected Users**   |   6   | Users who renew the storage contract.                    |
+| **Discoverability**  |   2   | Hard to detect unless slot filling is closely monitored. |
+
+**Average DREAD Score:** **3.4**
 
 ## Elevation of privilege
 
-Threat action intending to gain privileged access to resources in order to gain unauthorized access
-to information or to compromise a system.
+Threat action intending to gain privileged access to resources in order to gain unauthorized access to information or to compromise a system.
 
 ### Exploring a vulnerability
 
 #### Scenario
 
-An attacker finds a vulnerability in Codex’s smart contract after it’s deployed. Anyone can call it.
-The attacker uses this to change deal terms in their favor, taking over the funds.
+An attacker discovers a vulnerability in Codex’s smart contract after it is deployed.
+Since anyone can interact with the contract, the attacker exploits the vulnerability to change
+deal terms in their favor and take control of the funds.
 
 ```
                          ┌────────────────────────────┐
@@ -945,10 +1215,22 @@ Edit/view: https://cascii.app/23869
 
 #### Impacts
 
-- **Financial Loss**: Attackers could tweak deals to steal funds or stop payments.
-- **System Disruption**: The integrity of the Codex protocol is compromised, leading to a loss of trust.
+- **Financial**: Attackers could modify deals to steal funds or block payments.
+- **Disruptability**: The integrity of the Codex protocol is compromised, leading to a loss of trust.
 
 #### Mitigation
 
-Use upgradable contracts to allow for future fixes. Additionally, implement temporary admin roles
-requiring multiple approvals for changing critical settings.
+Use upgradable contracts to enable future fixes. Additionally, implement temporary admin roles
+with multi-signature approval for changing critical settings or logic.
+
+#### DREAD Score
+
+| DREAD Component      | Score | Description                                                    |
+| -------------------- | :---: | -------------------------------------------------------------- |
+| **Damage Potential** |  10   | Full control over deal logic or funds.                         |
+| **Reproducibility**  |   9   | Easy to repeat once the vulnerability is known.                |
+| **Exploitability**   |   5   | Requires finding and triggering a public contract weakness.    |
+| **Affected Users**   |  10   | Affects all users using the vulnerable contract.               |
+| **Discoverability**  |   5   | Harder to find, but public contract code helps skilled actors. |
+
+**Average DREAD Score:** **7.8**
