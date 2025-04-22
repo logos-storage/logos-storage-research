@@ -1179,7 +1179,7 @@ deal terms in their favor and take control of the funds.
   Take control of the s                ▼
   mart contracts         ┌───────────────────────────┐
                          │                           │
-        ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶ │       Smart contracts     │
+        ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶│       Smart contracts     │
         ╷                │                           │
         ╷                ╷───────────────────────────┘
         ╷                ╷             ▲
