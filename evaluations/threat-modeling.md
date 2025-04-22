@@ -71,12 +71,12 @@ form that, upon the user's click, triggers a request to the Codex node to create
    ──────
  ─│      ─│              ┌────────────────┐
 │           │            │                │
-│ Attacker  │───────────▶│ Email phishing │
+│ Attacker  │╶╶╶╶╶╶╶╶╶▶  │ Email phishing │
 │           │            │                │
  ─│      ─│              └────────────────┘
-   ──────                        │
-      •                          │
-      •                          │
+   ──────                        ╷
+      •                          ╷
+      •                          ╷
       •                          ▼
       •                       ──────
       •                     ─│      ─│
@@ -85,32 +85,32 @@ form that, upon the user's click, triggers a request to the Codex node to create
       •                    │           │
       •                     ─│      ─│
       •                       ──────
-      •                          │
-      •                          │
-      •                          │  Clicks on the phishing email
-      •                          │
-      •                          │
+      •                          ╷
+      •                          ╷
+      •                          ╷  Clicks on the phishing email
+      •                          ╷
+      •                          ╷
       •                          ▼
       •                  ┌────────────────┐
       •                  │                │
       •                  │ Unsecure form  │
       •                  │                │
       •                  └────────────────┘
-      •                          │
-      •                          │  Submits the form
-      •                          │
-      •                          │  action=/storage/request/CIDMalicious method=POST
-      •                          │  input name="pricePerBytePerSecond" value="100000"
+      •                          ╷
+      •                          ╷  Submits the form
+      •                          ╷
+      •                          ╷  action=/storage/request/CIDMalicious method=POST
+      •                          ╷  input name="pricePerBytePerSecond" value="100000"
       •                          ▼
       •                  ┌────────────────┐
       •                  │                │
       •                  │  Codex node    │
       •                  │                │
       •                  └────────────────┘
-      •                          │
-      •                          │   POST /storage/request/CIDMalicious
-      •                          │   pricePerBytePerSecond: 1000000
-      •                          │
+      •                          ╷
+      •                          ╷   POST /storage/request/CIDMalicious
+      •                          ╷   pricePerBytePerSecond: 1000000
+      •                          ╷
       •                          ▼
       •                  ┌────────────────┐
       •                  │                │
@@ -119,7 +119,7 @@ form that, upon the user's click, triggers a request to the Codex node to create
                          └────────────────┘
 ```
 
-Edit/view: https://cascii.app/437bc
+Edit/view: https://cascii.app/21c64
 
 #### Impacts
 
@@ -325,17 +325,17 @@ Implement EIP-712 to include chain-specific data in the signed transaction.
 This ensures the signature is only valid on the intended chain and prevents unauthorized
 replays on other chains.
 
-#### DREAD Score: Cross-Chain Attack Replays
+#### DREAD Score
 
 | DREAD Component      | Score | Description                                        |
 | -------------------- | :---: | -------------------------------------------------- |
 | **Damage Potential** |   8   | Can drain user funds across multiple chains.       |
 | **Reproducibility**  |   5   | Needs two contract deployments on two blockchains. |
 | **Exploitability**   |   7   | Needs access to a signed transaction.              |
-| **Affected Users**   |   9   | Affects any user.                                  |
+| **Affected Users**   |  10   | Affects any user.                                  |
 | **Discoverability**  |   7   | Easy to try for the attacker.                      |
 
-**Average DREAD Score:** **7.2**
+**Average DREAD Score:** **7.4**
 
 #### References
 
@@ -504,7 +504,7 @@ failed proofs, the provider is removed from the contract, freeing the slot for a
 #### Scenario
 
 The `markProofAsMissing` function, along with related functions such as `fillSlot` and `requestStorage`,
-makes external calls (e.g., `transferFrom`) before completing internal state updates.
+makes external calls (e.g., `transfer`) before completing internal state updates.
 This opens the door to reentrancy attacks, where an attacker can re-enter the function and trigger
 multiple operations in a single transaction, such as slashing collateral multiple times
 or claiming validator rewards repeatedly.
@@ -546,15 +546,15 @@ Use OpenZeppelin’s `ReentrancyGuard` to prevent nested entry into sensitive fu
 | **Damage Potential** |   8   | Can drain funds via multiple slashes and rewards.     |
 | **Reproducibility**  |   2   | Works consistently if reentrancy is not prevented.    |
 | **Exploitability**   |   2   | Requires contract-level knowledge and timing control. |
-| **Affected Users**   |   6   | Affects all contracts using `markProofAsMissing`.     |
+| **Affected Users**   |  10   | Affects any user.                                     |
 | **Discoverability**  |   6   | Can be found through careful contract audit.          |
 
-**Average DREAD Score:** **4.8**
+**Average DREAD Score:** **5**
 
 #### References
 
-[Solidity](https://docs.soliditylang.org/en/latest/security-considerations.html#reentrancy)
-[Checks-Effects-Interactions](https://docs.soliditylang.org/en/latest/security-considerations.html#use-the-checks-effects-interactions-pattern)
+[Solidity](https://docs.soliditylang.org/en/latest/security-considerations.html#reentrancy)  
+[Checks-Effects-Interactions](https://docs.soliditylang.org/en/latest/security-considerations.html#use-the-checks-effects-interactions-pattern)  
 [Reentrancy guard](https://docs.openzeppelin.com/contracts/4.x/api/security#ReentrancyGuard)
 
 ## Repudiation
@@ -608,14 +608,14 @@ Fill Request 1 Slot 2      ╷                                   ╷
                     ─│──      ───│   to fill Request 2 Slot 2  ╷
                      │           │                             ▼
                    │               │                ┌────────────────────┐
-                   │  Clever host  │╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶ │Slot 1│Slot 2│Slot 3│
+                   │  Clever host  │╶╶╶╶╶╶╶╶╶╶╶╶╶▶  │Slot 1│Slot 2│Slot 3│
                    │               │                └────────────────────┘
                      │           │
                     ─│──      ───│
                         ──────
 ```
 
-Edit/view: https://cascii.app/93704
+Edit/view: https://cascii.app/9e208
 
 #### Impacts
 
@@ -625,11 +625,9 @@ Edit/view: https://cascii.app/93704
 #### Mitigation
 
 This attack is mitigated by the storage provider losing its request collateral for the first
-slot once it is abandoned. Additionally, after filling the first slot, the provider begins
-to accrue rewards over time, but these rewards are only paid out if the request is
-successfully completed. This delayed payout acts as an additional disincentive for the
-storage provider to abandon the slot.
-``
+slot once it is abandoned. Additionally, after filling the first slot, the rewards are only paid
+out if the request is successfully completed. This delayed payout acts as an additional disincentive f
+or the storage provider to abandon the slot.
 
 #### DREAD Score
 
@@ -692,17 +690,17 @@ Other users could access this information, creating a privacy risk.
 │           │       │           │       │           │
  ─│      ─│          ─│      ─│          ─│      ─│
    ──────              ──────              ──────
-      ╷                   ╷                   ╷
-      ╷                   ╷                   ╷
-      ╷                   ▼                   ╷
-      ╷        ┌──────────────────────┐       ╷
-      ╷        │                      │       ╷
-      └╶╶╶╶╶╶▶ │     Original file    │◀╶╶╶╶╶╶┘
+     ╷                    ╷                    ╷
+     ╷                    ╷                    ╷
+     ╷                    ▼                    ╷
+     ╷         ┌──────────────────────┐        ╷
+     ╷         │                      │        ╷
+     └╶╶╶╶╶╶▶  │     Original file    │ ◀╶╶╶╶╶╶┘
                │                      │
                └──────────────────────┘
 ```
 
-Edit/view: https://cascii.app/07f58
+Edit/view: https://cascii.app/7ff0e
 
 #### Impacts
 
@@ -713,9 +711,9 @@ Edit/view: https://cascii.app/07f58
 
 #### Mitigation
 
-Encrypt files on the client side before upload to ensure that only authorized users
-can decrypt and access the contents. In addition, sensitive metadata should be removed or
-encrypted where possible to reduce the risk of privacy leaks.
+Encrypt files to ensure that only authorized users can decrypt and access the contents.
+In addition, sensitive metadata should be removed or encrypted where possible to reduce
+the risk of privacy leaks.
 
 #### DREAD Score
 
@@ -729,7 +727,7 @@ encrypted where possible to reduce the risk of privacy leaks.
 
 **Average DREAD Score:** **5.6**
 
-[References]
+References
 
 [Metadata = Surveillance](https://www.schneier.com/blog/archives/2014/03/metadata_survei.html?utm_source=chatgpt.com)
 
@@ -743,7 +741,7 @@ blocking, or disrupting normal operations.
 #### Scenario
 
 In a single-reservation system, each slot is assigned to one storage provider through a 1-to-1 match.
-A storage provider may reserve a slot but delay filling it, hoping a better opportunity will appear —
+A storage provider may reserve a slot but delay filling it, hoping a better opportunity will appear,
 one that offers a higher reward than the original slot.
 
 ```
@@ -754,14 +752,14 @@ one that offers a higher reward than the original slot.
    │           │                                         │           │
     ─│      ─│                                            ─│      ─│
       ──────                                                ──────
-         ╷                                                     ╷
-         ╷                                                     ╷
-         ╷                                                     ╷
-         ╷                                                     ╷
-         ╷                                                     ╷
-         ╷               ┌────────────────────┐                ╷
-         ╷               │                    │                ╷
-         └╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶│   Codex network    │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+         ╷                                                      ╷
+         ╷                                                      ╷
+         ╷                                                      ╷
+         ╷                                                      ╷
+         ╷                                                      ╷
+         ╷               ┌────────────────────┐                 ╷
+         ╷               │                    │                 ╷
+         └╶╶╶╶╶╶╶╶╶╶╶╶▶  │   Codex network    │ ◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                          │                    │
              ┌╶╶╶╶╶╶╶╶╶╶╶└────────────────────┘╶╶╶╶╶╶╶╶╶╶╶╶┐
              ╷                     ╷                       ╷
@@ -772,20 +770,20 @@ Request 1    ╷                     ╷                       ╷   Request 2
   ┌────────────────────┐           ╷            ┌────────────────────┐
   │Slot 1│Slot 2│Slot 3│           ╷            │Slot 1│Slot 2│Slot 3│
   └────────────────────┘           ╷            └────────────────────┘
-             ╷                     ╷                       ╷
-             ╷                     ╷                       ╷
-             ╷                  ──────                     ╷
-             ╷              ─│──      ───│                 ╷
-             ╷               │           │                 ╷
-             ╷             │               │               ╷
-             └╶╶╶╶╶╶╶╶╶╶╶╶▶│   Lazy host   │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
+             ╷                     ╷                        ╷
+             ╷                     ╷                        ╷
+             ╷                  ──────                      ╷
+             ╷              ─│──      ───│                  ╷
+             ╷               │           │                  ╷
+             ╷             │               │                ╷
+             └╶╶╶╶╶╶╶╶╶╶╶▶ │   Lazy host   │ ◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘
                            │               │
 Reserve Request 1 Slot 2     │           │      Reserve Request 2 Slot 2
                             ─│──      ───│
                                 ──────
 ```
 
-Edit/view: https://cascii.app/6144e
+Edit/view: https://cascii.app/1f8a4
 
 #### Impacts
 
@@ -803,13 +801,13 @@ complete the request, ensuring reliability.
 
 | DREAD Component      | Score | Description                                                    |
 | -------------------- | :---: | -------------------------------------------------------------- |
-| **Damage Potential** |   7   | Fails storage requests, but no direct economic loss.           |
-| **Reproducibility**  |   5   | Easy to repeat if system allows only single reservations.      |
+| **Damage Potential** |   7   | Fails storage requests.                                        |
+| **Reproducibility**  |   8   | Easy to repeat if system allows only single reservations.      |
 | **Exploitability**   |   3   | Requires strategic delay by the storage provider.              |
 | **Affected Users**   |   4   | Affects users assigned to non-participating storage providers. |
 | **Discoverability**  |   4   | Hard to detect until the storage deadline is missed.           |
 
-**Average DREAD Score:** **4.6**
+**Average DREAD Score:** **5.2**
 
 ### Overload attack
 
@@ -834,14 +832,14 @@ This overloads validators and delays their ability to detect missed proofs in ti
           ┌─────────────────────────────────┐
           │R1│R2│R3│R4│R5│R5│R6│R7│R8│R9│R10│
           └─────────────────────────────────┘
-            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷   │
-            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷   │
-            ╷  ╷  └╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘  ╷   │
-            ╷  ╷           ╷           ╷   │
-            ╷  ╷           ▼           ╷   │
-            ╷  └▶┌────────────────────◀┘   │
-            ╷    │                    │    │
-            └╶╶╶▶│       Codex        │◀───┘
+            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷    ╷
+            ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷  ╷    ╷
+            ╷  └╶╶└╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶┘╶╶┘    ╷
+            ╷              ╷                ╷
+            ╷              ▼                ╷
+            ╷    ┌────────────────────┐     ╷
+            ╷    │                    │     ╷
+            └╶▶  │       Codex        │◀╶╶╶╶┘
                  │                    │
                  └────────────────────┘
                            ╷
@@ -861,7 +859,7 @@ This overloads validators and delays their ability to detect missed proofs in ti
                 Validators are too busy
 ```
 
-Edit/view: https://cascii.app/b6a31
+Edit/view: https://cascii.app/3af32
 
 #### Impacts
 
@@ -876,15 +874,15 @@ limiting the number of storage requests per IP address, and setting a minimum fi
 
 #### DREAD Score
 
-#### DREAD Score: Overload Attack
+#### DREAD Score
 
-| DREAD Component      | Score | Description                                                    |
-| -------------------- | :---: | -------------------------------------------------------------- |
-| **Damage Potential** |   8   | Temporarily weakens validation and file availability.          |
-| **Reproducibility**  |   2   | Hard to repeat.                                                |
-| **Exploitability**   |   2   | Requires ability to send many valid requests at scale.         |
-| **Affected Users**   |  10   | Affects all users.                                             |
-| **Discoverability**  |   4   | Noticeable during high load but hard to trace to one attacker. |
+| DREAD Component      | Score | Description                                            |
+| -------------------- | :---: | ------------------------------------------------------ |
+| **Damage Potential** |   8   | Temporarily weakens validation and file availability.  |
+| **Reproducibility**  |   2   | Hard to repeat.                                        |
+| **Exploitability**   |   2   | Requires ability to send many valid requests at scale. |
+| **Affected Users**   |  10   | Affects all users.                                     |
+| **Discoverability**  |   5   | Requires high activity.                                |
 
 **Average DREAD Score:** **5.2**
 
@@ -954,7 +952,7 @@ This makes it economically unfeasible to sustain large-scale spamming.
 | **Reproducibility**  |   2   | Possible but limited by transaction costs and network capacity. |
 | **Exploitability**   |   2   | Requires funding.                                               |
 | **Affected Users**   |   8   | Affects most users during periods of slot disruption.           |
-| **Discoverability**  |   3   | Hard to discover.                                               |
+| **Discoverability**  |   3   | Requires high activity.                                         |
 
 **Average DREAD Score:** **4.0**
 
@@ -1021,45 +1019,37 @@ A storage provider attempts to fill multiple slots in the same storage request b
 multiple offers. This gives them a larger share of the deal, limiting participation by other providers.
 
 ```
-             ──────
-           ─│      ─│
-          │           │
-          │   User    │
-          │           │
-           ─│      ─│
-             ──────
-                ╷
-Upload a file   ╷
-                ╷
-                ▼
-       ┌─────────────────┐
-       │                 │
-       │      Codex      │
-       │                 │
-       └─────────────────┘
-                ╷
-                ╷
-                ╷
-                ╷
-                ▼
-      ┌────────────────────┐
-      │Slot 1│Slot 2│Slot 3│
-      └────────────────────┘
-          ╷      ╷      ╷
-          ╷      ╷      ╷
-          └╶╶╶╶╶╶╷╶╶╶╶╶╶┘
-                 ╷
-                 ▼
-              ──────
-            ─│      ─│
-           │           │
-           │    SP     │
-           │           │
-            ─│      ─│
-              ──────
+                      ──────
+                    ─│      ─│
+                   │           │
+                   │   User    │
+                   │           │
+                    ─│      ─│
+                      ──────
+                         ╷
+         Upload a file   ╷
+                         ╷
+                         ▼
+                ┌─────────────────┐
+                │                 │
+                │      Codex      │◀╶╶╶╶╶╶╶╶╶╶╶╶╶╶┐
+                │                 │               ╷
+                ╷─────────────────╷               ╷
+                ╷                 ╷               ╷
+                ╷                 ╷ Block the     ╷
+Store the file  ╷                 ╷ content       ╷                  ──────
+                ╷                 ╷         ┌───────────┐          ─│      ─│
+                ╷     ──────      ╷         │           │         │           │
+                ╷   ─│      ─│    ╷         │    CID    │◀╶╶╶╶╶╶╶╶│   User    │
+                ╷  │           │  ╷         │           │         │           │
+                └▶ │    SP     │◀╶┘         └───────────┘          ─│      ─│
+                   │           │                                     ──────
+                    ─│      ─│
+                      ──────
+
 ```
 
-Edit/view: https://cascii.app/f3984
+Edit/view: https://cascii.app/279c5
 
 #### Impacts
 
@@ -1077,7 +1067,7 @@ the request, the mechanism may be less effective, as fewer providers may be avai
 
 | DREAD Component      | Score | Description                                                   |
 | -------------------- | :---: | ------------------------------------------------------------- |
-| **Damage Potential** |   5   | Reduces fairness; may lead to centralization over time.       |
+| **Damage Potential** |   5   | Reduces fairness, may lead to centralization over time.       |
 | **Reproducibility**  |   6   | Easy to repeat with fast or automated submissions.            |
 | **Exploitability**   |   2   | Requires timing advantage or faster infrastructure.           |
 | **Affected Users**   |   6   | Affects any users sharing storage requests with greedy hosts. |
@@ -1181,7 +1171,7 @@ deal terms in their favor and take control of the funds.
   Take control of the s                ▼
   mart contracts         ┌───────────────────────────┐
                          │                           │
-        ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶│       Smart contracts     │
+        ┌╶╶╶╶╶╶╶╶╶╶╶╶╶╶▶ │       Smart contracts     │
         ╷                │                           │
         ╷                ╷───────────────────────────┘
         ╷                ╷             ▲
@@ -1211,7 +1201,7 @@ deal terms in their favor and take control of the funds.
                                     ──────
 ```
 
-Edit/view: https://cascii.app/23869
+Edit/view: https://cascii.app/4d5a6
 
 #### Impacts
 
