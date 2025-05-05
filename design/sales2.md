@@ -192,8 +192,9 @@ until it is deleted. The properties of a created `Availability` can be updated
 at any time.
 
 Because availability(ies) represents *future* sales (and not active sales), and
-because fields of the matching `Availability` are persisted in a `SalesOrder`,
-availabilities are not tied to active sales and can be manipulated at any time.
+because fields of the matching `Availability` can be persisted in a `SalesOrder`
+(if needed), availabilities are not tied to active sales and can be manipulated
+at any time.
 
 ### `SalesOrder` object
 
@@ -328,17 +329,17 @@ The underlying `RepoStore` of the `SalesRepo` is responsible to reading and
 writing datasets to storage. Its API will include:
 
 ```nim
-proc store(id: DatasetId)
- ## Stores blocks of the dataset, incrementing their ref count.
-proc delete(id: DatasetId)
- ## Decreases the ref count of blocks of the dataset, deleting if the ref count is 0.
+proc onStore(id: DatasetId)
+ ## Stores a dataset, incrementing its ref count.
+proc onClear(id: DatasetId)
+ ## Decreases the ref count of the dataset, deleting if the ref count is 0.
 ```
 
 Datasets will be tracked by a particular id, but it is TBD as to what that ID
 will be:
 
-- Preferred option for MP is `manifestCID + slotIndex`.
-- Alternative options discussed: `treeCid + slotIndex`, `slotRoot`.
+- Preferred option for MP: `requestId + slotIndex`.
+- Alternative options discussed: `treeCid + slotIndex`, `slotRoot`,  `requestId + slotIndex + manifestCid`
 
 ## Total collateral
 

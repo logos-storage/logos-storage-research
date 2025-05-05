@@ -44,11 +44,28 @@ RepoStore will add support for explicit deletes.
 - Marketplace calls `onStore` with a `requestId, slotIdx` (and a manifest cid if needed)
 - Marketplace calls `delete` with a `requestId, slotIdx` (and a manifest cid if needed)
 
+#### `onStore` considerations
+
+`onStore` is a long-running operation that may not finish before a request
+cancellation. If this happens, `SaleDownloading.run` will be cancelled, which
+will cancel the `onStore` call, so `onStore` will need to handle this exception
+appropriately.
+
 ### Phase III
 
-Phase III will include additional Marketplace features that go beyond the
-"baseline" [simplification of the Marketplace sales
-design](https://github.com/codex-storage/codex-research/blob/refactor/simplified-sales-and-purchasing/design/sales2.md).
+Phase III will include [resumption of local state in the Marketplace](https://github.com/codex-storage/codex-research/blob/refactor/simplified-sales-and-purchasing/design/sales2.md).
+
+#### Resumable downloads support
+
+Depends on: [Marketplace resumption of local state](https://github.com/codex-storage/codex-research/blob/refactor/simplified-sales-and-purchasing/design/sales2.md#resuming-local-state-eg-downloading)
+
+- `onStore` will need to internally track the state of building a slot, to allow
+  for recovery (Download Manager), remembering to handle cancellations
+  appropriately.
+- When the Marketplace restores a local sale to the downloading state, `onStore`
+  will be called and it will resume its operation based on the state.
+
+### Phase IV and beyond
 
 #### Marketplace concurrency support
 
@@ -57,22 +74,6 @@ Depends on: [Marketplace support for concurrent workers](https://github.com/code
 - Avoid waiting for serial operations to finish when there are concurrent
   stores/deletes (due to locking) by implementing a Marketplace-level dataset
   ref count.
-
-#### Resumable downloads support
-
-Depends on: [Marketplace resumption of local state](https://github.com/codex-storage/codex-research/blob/refactor/simplified-sales-and-purchasing/design/sales2.md#resuming-local-state-eg-downloading)
-
-- `onStore` will need to internally track the state of building a slot, to allow
-  for recovery (Download Manager)
-- When the Marketplace restores a local sale to the downloading state, `onStore`
-  will be called and it will resume its operation based on the state.
-
-#### `onStore` considerations
-
-`onStore` is a long-running operation that may not finish before a request
-cancellation. If this happens, `SaleDownloading.run` will be cancelled, which
-will cancel the `onStore` call, so `onStore` will need to handle this exception
-appropriately.
 
 ## Phase I: Expiries but no delete
 
@@ -140,6 +141,11 @@ flowchart LR
 
 ### Downloading
 
+It is important to note that the Marketplace does not update the expiry
+directly. Updating of the dataset expiry is done indirectly via
+`onStore(expiry)`. However, consideration of expiration update success is still
+needed to analyse recoverability.
+
 ```mermaid
 ---
 config:
@@ -179,7 +185,7 @@ config:
 flowchart LR
   WaitForStableChallenge["Wait for stable challenge"] -->
   GetChallenge["Get challenge"] -- challenge -->
-  onProve["onProve(slot, challege)"] -->
+  onProve["onProve(slot, challenge)"] -->
   SaleFilling
 
   WaitForStableChallenge -- Exception --> SaleErrored
@@ -193,7 +199,7 @@ flowchart LR
 | Situation                                                                      | Outcome                                     |
 |--------------------------------------------------------------------------------|---------------------------------------------|
 | CRASH at any point                                                             | The slot is forfeited.                      |
-| EXCEPTION at any point                                                         | Goes to SaleErrored. The slot is forfeited. |
+| EXCEPTION at any point                                                         | Goes to `SaleErrored`. The slot is forfeited. |
 | CANCELLATION during "wait for stable challenge", "get challenge", or `onProve` | The slot is forfeited.                      |
 
 ### Filling
@@ -290,10 +296,10 @@ flowchart TB
   WaitUntilNextPeriod -- Exception --> SaleErrored
 ```
 
-| Situation                                                                                      | Outcome                                                                                                                                                  | Solution                                                                                                                                                                                                                                                                                                                                    |
-|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CRASH at any point                                                                             | On chain state is restored at startup, starting in `SaleFilled` state which extends the expiry to request end (no op), then moves back to `SaleProving`. |                                                                                                                                                                                                                                                                                                                                             |
-| EXCEPTION during `getSlotState`, `waitForNextPeriod`, `getCurrentPeriod`, or `getChallenge`    | Goes to `SaleErrored`, all proving is stopped and SP becomes at risk of being slashed.                                                                   | For network exceptions, implement retry functionality, with exponential backoff. For other exceptions, go to `SaleErrored`. Exceptions may include any errors resulting from the JSON RPC call, or errors originating in ethers.                                                                                                            |
+| Situation                                                                                      | Outcome                                                                                                                                                  | Solution                                                                                                                                                                                                                                                                                                                                                                    |
+|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CRASH at any point                                                                             | On chain state is restored at startup, starting in `SaleFilled` state which extends the expiry to request end (no op), then moves back to `SaleProving`. |                                                                                                                                                                                                                                                                                                                                                                             |
+| EXCEPTION during `getSlotState`, `waitForNextPeriod`, `getCurrentPeriod`, or `getChallenge`    | Goes to `SaleErrored`, all proving is stopped and SP becomes at risk of being slashed.                                                                   | For network exceptions, implement retry functionality, with exponential backoff. For other exceptions, go to `SaleErrored`. Exceptions may include any errors resulting from the JSON RPC call, or errors originating in ethers.                                                                                                                                            |
 | CANCELLATION during `getSlotState`, `waitForNextPeriod`, `getCurrentPeriod`, or `getChallenge` | Goes to `SaleErrored`, all proving is stopped and SP becomes at risk of being slashed.                                                                   | Possible options include:<br>1. Raise a Defect, crashing the node and forcing a restart. On startup, slot will enter the `SaleFilled` state, then move to `SaleProving`.<br>2. Log an error and increment a metric counter.<br>2. Do not propagate the cancellation. The sale will continue in the `SaleProving` state. Waiters (eg `cancelAndWait` may wait indefinitely). |
 
 ### Payout
@@ -313,13 +319,13 @@ flowchart LR
   OnFailed["RequestFailed contract event"] --> SaleFailed
 ```
 
-| Situation                         | Outcome                                                                                                                                                                                                                                    | Solution |
-|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--|
-| `freeSlot` is successful          | SUCCESS                                                                                                                                                                                                                                    | |
-| CRASH before `freeSlot` completes | On chain state is restored at startup, starting in `SalePayout`, where `freeSlot` will be tried again.                                                                                                                                     | |
-| CRASH after `freeSlot` completes  | Slot is no longer part of `mySlots`, so on startup, slot state will not be restored.                                                                                                                                                       | |
+| Situation                         | Outcome                                                                                                                                                                                                                                    | Solution                                                                        |
+|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| `freeSlot` is successful          | SUCCESS                                                                                                                                                                                                                                    |                                                                                 |
+| CRASH before `freeSlot` completes | On chain state is restored at startup, starting in `SalePayout`, where `freeSlot` will be tried again.                                                                                                                                     |                                                                                 |
+| CRASH after `freeSlot` completes  | Slot is no longer part of `mySlots`, so on startup, slot state will not be restored.                                                                                                                                                       |                                                                                 |
 | EXCEPTION during `freeSlot`       | Goes to `SaleErrored`. If `freeSlot` succeeded before the exception, no clean up routines will be performed. If `freeSlot` did not succeed before the exception, no funds will have been paid out and there are no recovery options.       | For network exceptions, implement retry functionality with exponential backoff. |
-| CANCELLATION during `freeSlot`    | Goes to `SaleErrored`. If `freeSlot` succeeded before the cancellation, no clean up routines will be performed. If `freeSlot` did not succeed before the cancellation, no funds will have been paid out and there are no recovery options. |  |
+| CANCELLATION during `freeSlot`    | Goes to `SaleErrored`. If `freeSlot` succeeded before the cancellation, no clean up routines will be performed. If `freeSlot` did not succeed before the cancellation, no funds will have been paid out and there are no recovery options. |                                                                                 |
 
 ### Finished
 
@@ -348,12 +354,46 @@ flowchart LR
 
 ## Phase II: No expiries but deletes
 
-Depends on: `SalesOrder` implementation
+Depends on: `SalesOrder` "baseline" design implementation.
 
 Identify points of `SalesOrder` updates and `RepoStore` writes, with crashes,
 exceptions, or cancellations in between.
 
 ### Downloading
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart LR
+  FetchSlotState["Fetch slot state"] -- isRepairing -->
+  CreateSalesOrder["Create SalesOrder"] -->
+  OnStore["onStore(isRepairing)"] -->
+  SaleInitialProving
+
+  OnStore -- Exception --> SaleErrored
+  FetchSlotState -- Exception --> SaleErrored
+  CreateSalesOrder -- Exception --> SaleErrored
+
+  OnCancelled["Cancelled timer elapsed"] --> SaleCancelled
+  OnFailed["RequestFailed contract event"] --> SaleFailed
+```
+
+| Situation                                                                           | Outcome                                                                                                                                                                          |
+|-------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No crash/exception in `onStore(expiry)`                                             | Success                                                                                                                                                                          |
+| CRASH before create `SalesOrder`                                                      | The slot is forfeited, with no recovery on startup since the slot was not filled.                                                 |
+| CRASH before `onStore(expiry)`                                                      | The slot is forfeited, with no recovery on startup since the slot was not filled. On restart, the `SalesOrder` will be archived.                                                 |
+| CRASH in `onStore(expiry)`                                                          | The slot is forfeited, with no recovery on startup since the slot was not filled. On restart, the dataset will be cleaned up (corrective cleanup) and the `SalesOrder` archived. |
+| CRASH after `onStore(expiry)` but before the transition to `SaleInitialProving`     | The slot is forfeited, with no recovery on startup since the slot was not filled. On restart, the dataset will be cleaned up (corrective cleanup) and the `SalesOrder` archived.                                |
+| EXCEPTION before create `SalesOrder`                                                  | Goes to `SaleErrored`. The slot is forfeited.                                                                                                                                    |
+| EXCEPTION before `onStore(expiry)`                                                  | Goes to `SaleErrored`. The slot is forfeited. The `SalesOrder` will be archived.                                                                                                                                   |
+| EXCEPTION in `onStore(expiry)`                                                      | Goes to `SaleErrored`. The slot is forfeited. The dataset will be cleaned up (active cleanup) and the `SalesOrder` archived.                                                                    |
+| EXCEPTION after `onStore(expiry)` but before the transition to `SaleInitialProving` | The slot is forfeited. The dataset will be cleaned up (active cleanup) and the `SalesOrder` archived.                                                                                           |
+| CANCELLATION while fetching slot state                                              | The slot is forfeited.                                                                                                                                                           |
+| CANCELLATION during `onStore`                                                       | The slot is forfeited. The dataset will be cleaned up (active cleanup) and the `SalesOrder` archived.                                                                                           |
+
 
 `SalesOrders` are created in the downloading state before any data is written to
 disk.
