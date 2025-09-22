@@ -38,18 +38,18 @@ def Q_per_content(C, P):
 
 def total_bw_bytes_per_sec(N, T, C, P):
     """
-    Total bandwidth per provider (bytes/sec) as a function of N, T, C, P:
+    Total bandwidth per provider (KB/sec) as a function of N, T, C, P:
     BW_total = maintenance + advertise + query
     where:
       maintenance = (6.67 + 48.2*log2(N))
       advertise   = (C/T) * [14460*log2(N) + 3744]
-      query       = C * Q(C) * [14460*log2(N) + 16*(33 + 305*P)]
+      query       = (C * Q(C) * (14460*log2(N) + 528 + 16*(ceil(min(P,100)/5)*5 + 300*min(P,100)))) / N
     """
     maint = maint_bytes_per_sec(N)
     advert = (C / T) * advert_payload_bytes(N)
     Qc = Q_per_content(C, P)
-    query = C * Qc * query_payload_bytes(N, P)
-    return maint + advert + query
+    query = (C * Qc * (14460 * np.log2(N) + 528 + 16 * (np.ceil(min(P,100)/5) * 5 + 300*min(P,100)))) / N
+    return (maint + advert + query) / 1024
 
 # Plotting 2x2 grid (N x T), 3 curves per subplot (P buckets)
 fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
@@ -63,11 +63,11 @@ for i, N in enumerate(N_values):
             y = total_bw_bytes_per_sec(N, T, C_vals, P)
             ax.plot(H_weeks, y, color=colors[k % len(colors)], lw=2, label=label)
         ax.set_xlabel("Community age H (weeks)")
-        ax.set_ylabel("Total Bandwidth (bytes/sec)")
+        ax.set_ylabel("Total Bandwidth (KB/sec)")
         ax.set_title(f"N={int(N):,}, T={int(T/3600) if T>=3600 else T//60} {'h' if T>=3600 else 'min'}")
         ax.grid(True, linestyle="--", alpha=0.5)
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log", base=2)
+        ax.set_xscale("log", base=10)
+        ax.set_yscale("log", base=10)
         ax.legend()
 
 plt.tight_layout()

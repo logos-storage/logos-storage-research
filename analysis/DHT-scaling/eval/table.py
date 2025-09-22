@@ -31,9 +31,8 @@ def Q_per_content(C, P):
 
 
 def fmt(x):
-    # format bytes/sec in a nicer way
+    # format KB/sec in a nicer way
     if x == 0: return "0"
-    if x >= 1e9:  return f"{x/1e9:.3f}e9"
     if x >= 1e6:  return f"{x/1e6:.3f}e6"
     if x >= 1e3:  return f"{x/1e3:.3f}e3"
     return f"{x:.3f}"
@@ -47,23 +46,23 @@ for N in N_values:
         lines.append(f"\n### N = {int(N):,}, T = {int(T/3600) if T>=3600 else T//60} {'h' if T>=3600 else 'min'}\n")
         for bucket, P in P_buckets.items():
             lines.append(f"\n**{bucket}**\n")
-            lines.append("| H (weeks) | C (=H+1) | Total (B/s) | Maint % | Adv % | Query % |\n")
-            lines.append("|---:|---:|---:|---:|---:|---:|\n")
-            M = maint_bytes_per_sec(N)  # constant over H in a given (N)
-            Adv_payload = advert_payload_bytes(N)
+            lines.append("| C (=H+1) | Total (KB/s) | Maint % | Adv % | Query % |\n")
+            lines.append("|---:|---:|---:|---:|---:|\n")
+            M = maint_bytes_per_sec(N) / 1024.0  # constant over H in a given (N)
+            Adv_payload = advert_payload_bytes(N) / 1024.0
             for H in H_samples:
                 C = H + 1
                 # traffic categories:
                 maint = M
                 advert = (C / T) * Adv_payload
                 Qc = Q_per_content(C, P)
-                query = C * Qc * query_payload_bytes(N, p_msg=P)
+                query = (C * Qc * (14460 * math.log2(N) + 528 + 16 * (math.ceil(min(P,100)/5) * 5 + 300 * min(P,100)))) / N / 1024.0
                 total = maint + advert + query
                 # percentages:
                 maint_pct = (maint / total) * 100.0 if total > 0 else 0.0
                 advert_pct = (advert / total) * 100.0 if total > 0 else 0.0
                 query_pct = (query / total) * 100.0 if total > 0 else 0.0
-                lines.append(f"| {H:>3d} | {C:>3d} | {fmt(total)} | {maint_pct:6.2f}% | {advert_pct:6.2f}% | {query_pct:6.2f}% |\n")
+                lines.append(f"| {C:>3d} | {fmt(total)} | {maint_pct:6.2f}% | {advert_pct:6.2f}% | {query_pct:6.2f}% |\n")
 
 with open(output_file, "w", encoding="utf-8") as f:
     f.writelines(lines)
